@@ -14,7 +14,6 @@ const headerRef = ref(null);
 const illustrationRef = ref(null);
 const submitButtonRef = ref(null);
 
-// Router y store
 const router = useRouter();
 const store = useStore();
 
@@ -36,7 +35,6 @@ const schema = Yup.object().shape({
 
 // Efectos visuales para la ilustración
 const illustrationEffects = [
-    // Efecto de zoom suave
     () => {
         return gsap.to(illustrationRef.value, {
             backgroundSize: "110%",
@@ -44,7 +42,7 @@ const illustrationEffects = [
             ease: "sine.inOut",
             yoyo: true,
             repeat: -1
-        });
+        }); 
     },
     // Efecto de desplazamiento panorámico
     () => {
@@ -58,7 +56,6 @@ const illustrationEffects = [
     },
     // Efecto de pulso con brillo
     () => {
-        // Primero creamos un overlay con brillo
         const overlay = document.createElement('div');
         overlay.classList.add('illustration-glow');
         illustrationRef.value.appendChild(overlay);
@@ -73,35 +70,28 @@ const illustrationEffects = [
     }
 ];
 
-// Ciclo de vida del componente
+
 onMounted(async () => {
     store.commit('toggleEveryDisplay');
     store.commit('toggleHideConfig');
     document.body.classList.remove("bg-gray-100");
     
     await nextTick();
-    
-    // Animación inicial de entrada para el header
     gsap.from(headerRef.value, {
         y: -30,
         opacity: 0,
         duration: 1,
         ease: "power3.out"
     });
-    
-    // Animación inicial para la ilustración
     gsap.from(illustrationRef.value, {
         x: -100,
         opacity: 0,
         duration: 1.2,
         ease: "power3.out"
     });
-    
-    // Seleccionar un efecto aleatorio para la ilustración
     const randomEffectIndex = Math.floor(Math.random() * illustrationEffects.length);
     illustrationEffects[randomEffectIndex]();
-    
-    // Animación para los inputs del formulario
+
     gsap.from(".input-wrapper", {
         y: 30,
         opacity: 0,
@@ -110,8 +100,6 @@ onMounted(async () => {
         ease: "power2.out",
         delay: 0.3
     });
-    
-    // Animación para el botón
     gsap.from(submitButtonRef.value, {
         scale: 0.8,
         opacity: 0,
@@ -127,7 +115,6 @@ onBeforeUnmount(() => {
     document.body.classList.add("bg-gray-100");
 });
 
-// Manejadores de eventos para animaciones interactivas
 const handleInputFocus = (event) => {
     const wrapper = event.target.closest('.input-wrapper');
     
@@ -136,8 +123,7 @@ const handleInputFocus = (event) => {
         duration: 0.3,
         ease: "power2.out"
     });
-    
-    // Efecto de brillo alrededor del input
+
     gsap.to(event.target, {
         boxShadow: "0 0 8px rgba(66, 153, 225, 0.5)",
         duration: 0.3
@@ -153,7 +139,6 @@ const handleInputBlur = (event) => {
         ease: "power2.out"
     });
     
-    // Quitar el efecto de brillo
     gsap.to(event.target, {
         boxShadow: "none",
         duration: 0.3
@@ -176,7 +161,6 @@ const handleButtonLeave = () => {
     });
 };
 
-// Manejo del formulario
 const handleSignup = async () => {
     try {
         await store.dispatch('auth/register', user);

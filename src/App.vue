@@ -39,8 +39,6 @@ Coded by www.creative-tim.com
 <script>
 import Sidenav from "./examples/Sidenav";
 import Configurator from "@/examples/Configurator.vue";
-import Navbar from "@/examples/Navbars/Navbar.vue";
-import AppFooter from "@/examples/Footer.vue";
 import { mapMutations, mapState } from "vuex";
 
 export default {
@@ -48,8 +46,6 @@ export default {
   components: {
     Sidenav,
     Configurator,
-    Navbar,
-    AppFooter
   },
   methods: {
     ...mapMutations(["toggleConfigurator", "navbarMinimize"])

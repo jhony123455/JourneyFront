@@ -1,56 +1,66 @@
 <template>
   <aside
     id="sidenav-main"
-    class="sidenav navbar navbar-vertical navbar-expand-xs border-0 border-radius-xl my-3 ms-3"
-    :class="`${
-      isRTL ? 'me-3 rotate-caret fixed-end' : 'fixed-start ms-3'
-    } ${sidebarType}`"
+    ref="sidenav"
+    class="sidenav navbar navbar-vertical navbar-expand-xs border-0 border-radius-xl my-3"
+    :class="[isRTL ? 'me-3 rotate-caret fixed-end' : 'fixed-start ms-3', sidebarType, { collapsed: isCollapsed }]"
   >
     <div class="sidenav-header">
-      <i
-        class="top-0 p-3 cursor-pointer fas fa-times text-secondary opacity-5 position-absolute end-0 d-none d-xl-none"
-        aria-hidden="true"
-        id="iconSidenav"
-      ></i>
-      <a class="m-0 navbar-brand" href="/" style="margin-left: -20px !important;">
+      <a href="#" class="m-0 navbar-brand" @click.prevent="toggleCollapse">
         <img
-          :src="
-            sidebarType === 'bg-white' ||
-            (sidebarType === 'bg-transparent' && !isDarkMode)
-              ? logoDark
-              : logo
-          "
+          :src="journeyLogo"
           class="navbar-brand-img h-100"
           alt="main_logo"
         />
-        <span class="ms-2 font-weight-bold text-white"
-          >Material Dashboard 2 Laravel</span
-        >
       </a>
     </div>
+
     <hr class="horizontal light mt-0 mb-2" />
-    <sidenav-list />
+    <SidenavList :collapsed="isCollapsed" />
   </aside>
 </template>
-<script>
-import SidenavList from "./SidenavList.vue";
-import logo from "@/assets/img/logo-ct.png";
-import logoDark from "@/assets/img/logo-ct-dark.png";
-import { mapState } from "vuex";
 
-export default {
-  name: "index",
-  components: {
-    SidenavList,
-  },
-  data() {
-    return {
-      logo,
-      logoDark,
-    };
-  },
-  computed: {
-    ...mapState(["isRTL", "sidebarType", "isDarkMode"]),
-  },
-};
+<script setup>
+import { ref, computed, nextTick } from 'vue'
+import { useStore } from 'vuex'
+import gsap from 'gsap'
+import SidenavList from './SidenavList.vue'
+import journeyLogo from '@/assets/img/small-logos/journey_logo.png'
+
+const store = useStore()
+const isRTL = computed(() => store.state.isRTL)
+const sidebarType = computed(() => store.state.sidebarType)
+const isDarkMode = computed(() => store.state.isDarkMode)
+
+const sidenav = ref(null)
+const isCollapsed = ref(false)
+
+function toggleCollapse() {
+  isCollapsed.value = !isCollapsed.value
+
+  nextTick(() => {
+    gsap.to(sidenav.value, {
+      width: isCollapsed.value ? '80px' : '250px',
+      duration: 0.5,
+      ease: 'power2.inOut'
+    })
+  })
+}
 </script>
+
+<style scoped>
+#sidenav-main {
+  transition: width 0.3s ease;
+  width: 250px;
+  overflow: hidden;
+}
+
+#sidenav-main.collapsed {
+  width: 80px;
+}
+
+.navbar-brand-img {
+  transition: transform 0.3s ease;
+  cursor: pointer;
+}
+</style>

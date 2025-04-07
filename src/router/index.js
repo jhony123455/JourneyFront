@@ -13,6 +13,7 @@ import PasswordForgot from "../views/examples-api/PasswordForgot.vue";
 import PasswordReset from "../views/examples-api/PasswordReset.vue";
 import UserProfile from "../views/examples-api/profile/UserProfile.vue";
 import Users from "../views/examples-api/users/UsersList.vue";
+import CalendarView from "../views/Calendar/CalendarView.vue";
 
 const routes = [
   {
@@ -24,6 +25,11 @@ const routes = [
     path: "/dashboard",
     name: "Dashboard",
     component: Dashboard,
+  },
+  {
+    path: "/dashboards/calendario",
+    name: "Calendario",
+    component: CalendarView,
   },
   {
     path: "/tables",
