@@ -7,7 +7,7 @@ import * as Yup from 'yup';
 import { gsap } from 'gsap';
 import MaterialInputField from "@/components/MaterialInputField.vue";
 import MaterialButton from "@/components/MaterialButton.vue";
-import showSwal from "@/mixins/showSwal";
+import showSwal from "@/composables/showSwal";
 
 // Referencias para animaciones
 const headerRef = ref(null);

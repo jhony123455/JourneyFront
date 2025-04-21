@@ -27,7 +27,7 @@ const routes = [
     component: Dashboard,
   },
   {
-    path: "/dashboards/calendario",
+    path: "/calendario",
     name: "Calendario",
     component: CalendarView,
   },
@@ -35,16 +35,6 @@ const routes = [
     path: "/tables",
     name: "Tables",
     component: Tables,
-  },
-  {
-    path: "/billing",
-    name: "Billing",
-    component: Billing,
-  },
-  {
-    path: "/rtl-page",
-    name: "RTL",
-    component: RTL,
   },
   {
     path: "/notifications",
@@ -75,16 +65,6 @@ const routes = [
     path: "/signup",
     name: "Signup",
     component: Signup
-  },
-  {
-    path: "/password-forgot",
-    name: "Password Forgot",
-    component: PasswordForgot
-  },
-  {
-    path: "/password-reset",
-    name: "Password Reset",
-    component: PasswordReset
   },
   {
     path: "/user-profile",

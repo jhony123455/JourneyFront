@@ -47,7 +47,7 @@ import Navbar from "@/examples/PageLayout/Navbar.vue";
 import AppFooter from "@/examples/PageLayout/Footer.vue";
 import MaterialInputField from "@/components/MaterialInputField.vue";
 import MaterialButton from "@/components/MaterialButton.vue";
-import showSwal from "@/mixins/showSwal";
+import showSwal from "@/composables/showSwal";
 const body = document.getElementsByTagName("body")[0];
 import { mapMutations } from "vuex";
 

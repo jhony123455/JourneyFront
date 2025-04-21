@@ -28,8 +28,8 @@
   import MaterialButton from "@/components/MaterialButton.vue";
   import MaterialInput from "@/components/MaterialInput.vue";
   import ValidationError from "@/components/ValidationError.vue";
-  import formMixin from "@/mixins/formMixin.js";
-  import showSwal from "@/mixins/showSwal.js";
+  import formMixin from "@/composables/formMixin.js";
+  import showSwal from "@/composables/showSwal.js";
   
   export default {
     name: "Password",

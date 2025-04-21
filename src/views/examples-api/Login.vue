@@ -8,7 +8,7 @@ import { Form } from 'vee-validate';
 import MaterialInputField from "@/components/MaterialInputField.vue";
 import MaterialSwitch from "@/components/MaterialSwitch.vue";
 import MaterialButton from "@/components/MaterialButton.vue";
-import showSwal from "@/mixins/showSwal";
+import showSwal from "@/composables/showSwal";
 
 const router = useRouter();
 const store = useStore();
