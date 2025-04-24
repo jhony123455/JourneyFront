@@ -111,29 +111,6 @@
           </div>
         </div>
         <hr class="horizontal dark my-sm-4" />
-
-        <a
-          class="btn btn-outline-dark w-100"
-          href="https://vue-material-dashboard-laravel-docs.creative-tim.com/vue/overview/material-dashboard/"
-          >View documentation</a
-        >
-        <div class="text-center w-100">
-          <h6 class="mt-3">Thank you for sharing!</h6>
-          <a
-            href="https://twitter.com/intent/tweet?text=Check%20Vue%20Material%20Dashboard%202%20made%20by%20%40CreativeTim%20%23webdesign%20%23dashboard%20%23vuejs3&amp;url=https://www.creative-tim.com/product/vue-material-dashboard-laravel"
-            class="mb-0 btn btn-dark me-2"
-            target="_blank"
-          >
-            <i class="fab fa-twitter me-1" aria-hidden="true"></i> Tweet
-          </a>
-          <a
-            href="https://www.facebook.com/sharer/sharer.php?u=https://www.creative-tim.com/product/vue-material-dashboard-laravel"
-            class="mb-0 btn btn-dark me-2"
-            target="_blank"
-          >
-            <i class="fab fa-facebook-square me-1" aria-hidden="true"></i> Share
-          </a>
-        </div>
       </div>
     </div>
   </div>
