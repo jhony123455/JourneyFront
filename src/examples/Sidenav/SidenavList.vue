@@ -56,7 +56,7 @@
         </sidenav-collapse>
       </li>
 
-      <li
+    <!--   <li
         ref="configuraciones"
         class="nav-item"
         @mouseenter="hoverAnimation($event)"
@@ -72,7 +72,7 @@
             <i class="material-icons-round opacity-10 fs-5">settings</i>
           </template>
         </sidenav-collapse>
-      </li>
+      </li> -->
 
       <!-- User Section -->
       <li class="mt-3 nav-item" v-if="$store.state.isPinned">
