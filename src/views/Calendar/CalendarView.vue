@@ -495,18 +495,15 @@ const calendarOptions = {
 
     scheduledEvents.value.push(eventToAdd);
 
-    // Mostrar una notificación
     showNotification(
       `${activityObj.title} añadido al ${formatDate(info.dateStr)}`
     );
 
-    // Actualizar el calendario
     nextTick(() => {
       refreshCalendar();
     });
   },
   eventDrop(info) {
-    // Actualizar el evento cuando se arrastra a otra fecha
     const eventId = info.event.id;
     const eventIndex = scheduledEvents.value.findIndex((e) => e.id === eventId);
 
@@ -521,14 +518,11 @@ const calendarOptions = {
     }
   },
   eventResize(info) {
-    // Actualizar la duración del evento cuando se redimensiona
     const eventId = info.event.id;
     const eventIndex = scheduledEvents.value.findIndex((e) => e.id === eventId);
 
     if (eventIndex !== -1) {
       scheduledEvents.value[eventIndex].end = info.event.endStr;
-
-      // Mostrar una notificación
       const startDate = new Date(info.event.start);
       const endDate = new Date(info.event.end);
       const durationMinutes = Math.round((endDate - startDate) / (1000 * 60));
@@ -538,9 +532,7 @@ const calendarOptions = {
   },
 };
 
-// Nueva función para mostrar notificaciones temporales
 function showNotification(message, duration = 3000) {
-  // Crear elemento de notificación
   const notification = document.createElement("div");
   notification.className = "notification";
   notification.textContent = message;
@@ -611,14 +603,12 @@ function formatDate(dateStr) {
 
 function openAddActivity(activity = null, date = null) {
   if (activity) {
-    // Si se proporciona una actividad, editamos esa
     editMode.value = true;
     currentActivityId.value = activity.id;
     newActivity.value.title = activity.title;
     newActivity.value.color = activity.color || "#5e72e4";
     selectedTags.value = [...(activity.tags || [])];
   } else {
-    // Crear nueva actividad
     editMode.value = false;
     currentActivityId.value = null;
     newActivity.value = {
@@ -629,7 +619,6 @@ function openAddActivity(activity = null, date = null) {
     selectedTags.value = [];
   }
 
-  // Si se proporciona una fecha, programamos para esa fecha
   if (date) {
     scheduledDate.value = date;
   } else {
@@ -638,7 +627,6 @@ function openAddActivity(activity = null, date = null) {
 
   showModal.value = true;
 
-  // Animación de entrada del modal
   nextTick(() => {
     gsap.fromTo(
       modalRef.value,
@@ -673,7 +661,6 @@ function addTag() {
     selectedTags.value.push(selectedTag.value);
     selectedTag.value = "";
 
-    // Animar la nueva etiqueta
     nextTick(() => {
       const tags = document.querySelectorAll(".tag");
       const lastTag = tags[tags.length - 1];
@@ -704,7 +691,6 @@ function removeTag(index) {
 
 function saveActivity() {
   if (editMode.value && currentActivityId.value) {
-    // Actualizar actividad existente
     const activityIndex = availableActivities.value.findIndex(
       (activity) => activity.id === currentActivityId.value
     );
@@ -714,7 +700,6 @@ function saveActivity() {
       availableActivities.value[activityIndex].tags = [...selectedTags.value];
     }
 
-    // Actualizar eventos existentes con esta actividad
     scheduledEvents.value.forEach((event, index) => {
       if (event.extendedProps.activityId === currentActivityId.value) {
         scheduledEvents.value[index].title = newActivity.value.title;
@@ -726,7 +711,6 @@ function saveActivity() {
       }
     });
 
-    // Si estamos editando un evento específico
     if (currentEventId.value) {
       const eventIndex = scheduledEvents.value.findIndex(
         (event) => event.id === currentEventId.value
@@ -794,7 +778,6 @@ function saveActivity() {
   closeModal();
 }
 
-// Funciones para el menú contextual
 function editSelectedEvent() {
   if (selectedEvent.value) {
     const event = selectedEvent.value;
@@ -803,14 +786,12 @@ function editSelectedEvent() {
     currentEventId.value = event.id;
 
     if (activityId) {
-      // Si el evento está vinculado a una actividad
       const activity = availableActivities.value.find(
         (a) => a.id === activityId
       );
       if (activity) {
         openAddActivity(activity);
       } else {
-        // Si no encuentra la actividad, crear una nueva basada en el evento
         const eventActivity = {
           id: activityId,
           title: event.title,
@@ -820,7 +801,6 @@ function editSelectedEvent() {
         openAddActivity(eventActivity);
       }
     } else {
-      // Crear una actividad temporal basada en el evento
       const eventActivity = {
         id: `temp-${Date.now()}`,
         title: event.title,
@@ -838,7 +818,6 @@ function duplicateSelectedEvent() {
   if (selectedEvent.value) {
     const event = selectedEvent.value;
 
-    // Crear una copia del evento
     const newEvent = {
       id: `event-${Date.now()}`,
       title: `${event.title} (copia)`,
@@ -943,18 +922,14 @@ function deleteTag(index) {
     paddingBottom: 0,
     duration: 0.3,
     onComplete: () => {
-      // Eliminar la etiqueta
       const tagId = availableTags.value[index].id;
       availableTags.value.splice(index, 1);
-
-      // Eliminar esta etiqueta de todas las actividades que la usan
       availableActivities.value.forEach((activity) => {
         if (activity.tags && activity.tags.length) {
           activity.tags = activity.tags.filter((tag) => tag.id !== tagId);
         }
       });
 
-      // Eliminar esta etiqueta de todos los eventos programados
       scheduledEvents.value.forEach((event) => {
         if (event.extendedProps.tags && event.extendedProps.tags.length) {
           event.extendedProps.tags = event.extendedProps.tags.filter(
@@ -963,14 +938,12 @@ function deleteTag(index) {
         }
       });
 
-      // Actualizar el calendario
       refreshCalendar();
     },
   });
 }
 
 function handleDragStart(event, activity) {
-  // Añadir una clase para estilar durante el arrastre
   event.target.classList.add("dragging");
 
   const eventData = {
@@ -984,10 +957,8 @@ function handleDragStart(event, activity) {
     },
   };
 
-  // Establecer los datos de transferencia
   if (event.dataTransfer) {
     event.dataTransfer.setData("text/plain", JSON.stringify(eventData));
-    // Esto es importante para Firefox
     event.dataTransfer.effectAllowed = "copy";
   }
 
@@ -998,7 +969,6 @@ function handleDragStart(event, activity) {
     duration: 0.2,
   });
 
-  // Agregar evento para cuando termine el arrastre
   event.target.addEventListener(
     "dragend",
     () => {
@@ -1013,7 +983,6 @@ function handleDragStart(event, activity) {
   );
 }
 
-// Utilidad para generar un color aleatorio
 function getRandomColor() {
   const colors = [
     "#4da6ff",
@@ -1030,10 +999,8 @@ function getRandomColor() {
   return colors[Math.floor(Math.random() * colors.length)];
 }
 
-// Cerrar menú contextual al hacer clic fuera de él
 function handleDocumentClick(event) {
   if (showContextMenu.value) {
-    // Si el clic no fue dentro del menú contextual
     const contextMenuEl = document.querySelector(".context-menu");
     if (contextMenuEl && !contextMenuEl.contains(event.target)) {
       showContextMenu.value = false;
@@ -1041,7 +1008,6 @@ function handleDocumentClick(event) {
   }
 }
 
-// Definiendo moveCard y stopDragging antes de usarlos
 
 function moveCard(e) {
   if (!isDragging.value) return;
@@ -1108,16 +1074,10 @@ watch(
   { deep: true }
 );
 
-// Ciclo de vida del componente
 onMounted(() => {
-  // Cargar datos guardados
   loadData();
-
-  // Simular carga para animación
   setTimeout(() => {
     calendarReady.value = true;
-
-    // Animar entrada del calendario
     nextTick(() => {
       const calendarEl = document.querySelector(".calendar-fade-enter-active");
       refreshCalendar();
@@ -1146,10 +1106,7 @@ onMounted(() => {
     });
   }, 1000);
 
-  // Escuchar clics en el documento para cerrar menú contextual
   document.addEventListener("click", handleDocumentClick);
-
-  // Inicializar interactividad de la tarjeta de actividades (opcional)
   const activitiesCard = document.querySelector(".activities-card");
   if (activitiesCard.value) {
     // Hacer la tarjeta arrastrable
@@ -1168,7 +1125,6 @@ onMounted(() => {
       isDragging.value = true;
       startX.value = e.clientX;
       startY.value = e.clientY;
-      // Verificar si hay valores computados para left/top
       const computedStyle = window.getComputedStyle(activitiesCard.value);
       startLeft.value = parseInt(computedStyle.left) || 0;
       startTop.value = parseInt(computedStyle.top) || 0;
@@ -1181,7 +1137,6 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  // Eliminar listeners
   document.removeEventListener("click", handleDocumentClick);
 });
 </script>
