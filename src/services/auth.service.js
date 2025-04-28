@@ -1,47 +1,89 @@
-import axios from 'axios';
-import authHeader from './auth-header';
+import axios from "axios";
+import authHeader from "./auth-header";
 
-const API_URL = process.env.VUE_APP_API_BASE_URL
-const BASE_URL = process.env.VUE_APP_BASE_URL
+const BASE_URL = process.env.VUE_APP_API_BASE_URL;
 
 export default {
-
   async login(user) {
-    var response = await axios.post(API_URL + '/login', {
-      email: user.email,
-      password: user.password
-    }, 
-    {
-      headers: {
-        Accept: "application/vnd.api+json",
-        "Content-Type": "application/vnd.api+json",
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/auth/login`,
+        {
+          name: user.name,
+          password: user.password
+        },
+        {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000 // 10 segundos de timeout
+        }
+      );
+  
+      if (!response.data.token) {
+        throw new Error('No se recibió token en la respuesta');
       }
-    });
-    if (response.data.access_token) {
-      localStorage.setItem('user_free', JSON.stringify(response.data.access_token));
+  
+      localStorage.setItem("user_free", JSON.stringify(response.data.token));
+      return response.data;
+      
+    } catch (error) {
+      if (error.code === 'ECONNABORTED') {
+        throw new Error('Tiempo de espera agotado');
+      }
+      throw error;
     }
-    return response.data;
   },
 
   async logout() {
-    await axios.post(API_URL + "/logout", {}, { headers: authHeader() })
-    localStorage.removeItem('user_free');
+    await axios.post(BASE_URL + "/logout", {}, { headers: authHeader() });
+    localStorage.removeItem("user_free");
   },
 
   async register(user) {
-    var response = await axios.post(API_URL + '/register', {
-      name: user.name,
-      email: user.email,
-      password: user.password,
-      password_confirmation: user.confirmPassword
-    });
-    if (response.data.access_token) {
-      localStorage.setItem('user_free', JSON.stringify(response.data.access_token));
+    try {
+      const response = await axios.post(
+        BASE_URL + "/auth/register",
+        {
+          name: user.name,
+          password: user.password,
+          password_confirmation: user.password_confirmation,
+        },
+        {
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (response.data.token) {
+        localStorage.setItem("user_free", JSON.stringify(response.data.token));
+      }
+
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        if (error.response.status === 422) {
+          const errors = error.response.data.errors;
+          let errorMessages = [];
+
+          for (const key in errors) {
+            errorMessages.push(...errors[key]);
+          }
+
+          throw new Error(errorMessages.join("\n"));
+        }
+
+        throw new Error(error.response.data.message || "Error en el servidor");
+      } else {
+        throw error;
+      }
     }
-    return response.data;
   },
 
-  async passwordForgot(userEmail) {
+  /* async passwordForgot(userEmail) {
 
     var response = await axios.post(API_URL + '/password-forgot', {
       redirect_url: BASE_URL + "/password-reset",
@@ -59,5 +101,5 @@ export default {
       token: passwordDTO.token
     })
     return response.status;
-  }
-}
+  } */
+};

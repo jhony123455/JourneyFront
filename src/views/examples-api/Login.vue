@@ -12,20 +12,19 @@ import showSwal from "@/composables/showSwal";
 
 const router = useRouter();
 const store = useStore();
+const isLoading = ref(false);
 
 const user = ref({
-  email: "admin@jsonapi.com",
-  password: "secret",
+  name: "",
+  password: "",
 });
 
 const currentYear = computed(() => new Date().getFullYear());
 const loggedIn = computed(() => store.state.auth.loggedIn);
 
 const schema = Yup.object().shape({
-  email: Yup.string()
-    .email("Email has to be a valid email address")
-    .required("Email is a required input"),
-  password: Yup.string().required("Password is a required input"),
+  name: Yup.string().required("El nombre de usuario es requerido"),
+  password: Yup.string().required("La contraseña es requerida"),
 });
 
 onMounted(async () => {
@@ -73,16 +72,32 @@ onUnmounted(() => {
   store.commit("toggleHideConfig");
 });
 
-const handleLogin = async () => {
+const handleLogin = async (values, { resetForm }) => {
+  isLoading.value = true;
   try {
-    await store.dispatch("auth/login", user.value);
-    router.push({ name: "Dashboard" });
+    // Usamos los valores del formulario en lugar de user.value
+    const response = await store.dispatch("auth/login", {
+      name: values.username, // Asegúrate que coincide con el name del input
+      password: values.password,
+    });
+
+    if (response?.token) {
+      router.push({ name: "Calendario" });
+    }
   } catch (error) {
+    console.error("Error completo:", error); // Para depuración
     showSwal({
       type: "error",
-      message: "Invalid credentials!",
+      title: "Error en login",
+      message:
+        error.response?.data?.message ||
+        error.message ||
+        "Error al conectar con el servidor",
       width: 500,
     });
+    resetForm(); // Limpia el formulario en caso de error
+  } finally {
+    isLoading.value = false;
   }
 };
 
@@ -293,7 +308,7 @@ onMounted(() => {
                 <div class="mb-3">
                   <material-input-field
                     id="user"
-                    v-model="user.email"
+                    v-model="user.name"
                     label="Usuario"
                     name="username"
                     variant="static"
@@ -319,9 +334,18 @@ onMounted(() => {
                     class="my-4 mb-2"
                     variant="gradient"
                     color="dark"
+                    type="submit"
                     full-width
+                    :disabled="isSubmitting || isLoading"
                   >
-                    <span>Ingresa</span>
+                    <span v-if="!isSubmitting && !isLoading">Ingresa</span>
+                    <span v-else>
+                      <span
+                        class="spinner-border spinner-border-sm"
+                        role="status"
+                      ></span>
+                      Procesando...
+                    </span>
                   </material-button>
                 </div>
                 <p class="mt-4 text-sm text-center">

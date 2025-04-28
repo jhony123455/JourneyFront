@@ -20,6 +20,7 @@ const routes = [
     path: "/calendario",
     name: "Calendario",
     component: CalendarView,
+    /* meta: { requiresAuth: true }  */
   },
   {
     path: "/tables",

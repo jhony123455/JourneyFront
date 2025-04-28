@@ -1,41 +1,44 @@
 import Swal from "sweetalert2";
 
 export default {
-    methods:{
-        showSwal(options) {
-            new Swal({
-                toast: true,
-                position: "top-right",
-                iconColor: "white",
-                width: options.width ? options.width : 300,
-                text: options.message,
-                customClass: {
-                    popup: options.type === "success" ? "bg-success" : "bg-danger",
-                    htmlContainer: 'text-white',
-                },
-                showConfirmButton: false,
-                showCloseButton: true,
-                timer: 2000,
-                timerProgressBar: true,
-                
-            });
+  methods: {
+    // Notificación tipo "toast" moderna
+    showSwal(options) {
+      Swal.fire({
+        position: "top-end",          // Más moderno que "top-right"
+        icon: options.type || "info", // success/error/warning/info/question
+        title: options.title || "",   // Título opcional
+        text: options.message,        // Mensaje principal
+        showConfirmButton: false,
+        timer: 2000,
+        timerProgressBar: true,
+        backdrop: false,              // Sin fondo oscuro
+        toast: true,                  // Estilo toast compacto
+        background: "#fff",           // Fondo blanco (mejor legibilidad)
+        color: "#333",                // Texto oscuro
+        customClass: {
+          popup: "modern-swal-popup", // Clase CSS personalizable
         },
-        showSwalConfirmationDelete() {
-            const swalDelete = new Swal({
-                title: "Are you sure?",
-                text: "You won't be able to revert this!",
-                showCancelButton: true,
-                confirmButtonText: "Yes, delete it!",
-                cancelButtonText: "No, cancel!",
-                reverseButtons: true,
-                customClass: {
-                  confirmButton: "btn bg-gradient-success",
-                  cancelButton: "btn bg-gradient-danger",
-                },
-                buttonsStyling: false,
-              });
-            
-            return swalDelete;
+      });
+    },
+
+    // Confirmación de eliminación moderna
+    showSwalConfirmationDelete() {
+      return Swal.fire({
+        title: "¿Estás seguro?",
+        text: "¡Esta acción no se puede deshacer!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Sí, eliminar",
+        cancelButtonText: "Cancelar",
+        confirmButtonColor: "#3085d6", // Azul moderno
+        cancelButtonColor: "#d33",     // Rojo moderno
+        reverseButtons: true,
+        customClass: {
+          confirmButton: "modern-confirm-btn", // Clases CSS personalizadas
+          cancelButton: "modern-cancel-btn",
         },
-    }
-}
+      });
+    },
+  },
+};

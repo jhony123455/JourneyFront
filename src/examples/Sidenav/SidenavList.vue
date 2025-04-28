@@ -7,7 +7,7 @@
   >
     <ul class="navbar-nav">
       <!-- Features Section -->
-      <li class="mt-3 nav-item" v-if="$store.state.isPinned">
+      <li v-if="$store.state.isPinned" class="mt-3 nav-item">
         <h6
           class="text-xs ps-4 text-uppercase font-weight-bolder text-white"
           :class="$store.state.isRTL ? 'me-4' : 'ms-2'"
@@ -56,26 +56,9 @@
         </sidenav-collapse>
       </li>
 
-    <!--   <li
-        ref="configuraciones"
-        class="nav-item"
-        @mouseenter="hoverAnimation($event)"
-      >
-        <sidenav-collapse
-          url="#"
-          :aria-controls="''"
-          :collapse="false"
-          collapse-ref="configuraciones"
-          nav-text="Configuraciones"
-        >
-          <template #icon>
-            <i class="material-icons-round opacity-10 fs-5">settings</i>
-          </template>
-        </sidenav-collapse>
-      </li> -->
 
       <!-- User Section -->
-      <li class="mt-3 nav-item" v-if="$store.state.isPinned">
+      <li v-if="$store.state.isPinned" class="mt-3 nav-item">
         <h6
           class="text-xs ps-4 text-uppercase font-weight-bolder text-white"
           :class="$store.state.isRTL ? 'me-4' : 'ms-2'"
@@ -88,8 +71,8 @@
       </li>
 
       <li
-        class="nav-item"
         ref="perfil"
+        class="nav-item"
         @mouseenter="hoverAnimation($event)"
       >
         <sidenav-collapse
@@ -106,9 +89,10 @@
       </li>
 
       <li
-        class="nav-item"
         ref="logout"
+        class="nav-item"
         @mouseenter="hoverAnimation($event)"
+        @click.prevent="handleLogout"
       >
         <sidenav-collapse
           url="#"
@@ -131,6 +115,8 @@ import { onMounted, ref, nextTick } from 'vue'
 import SidenavCollapse from './SidenavCollapse.vue'
 import gsap from 'gsap'
 import { useStore } from 'vuex'
+import { useRouter } from 'vue-router'
+import Swal from 'sweetalert2'
 
 const store = useStore()
 const sidenav = ref(null)
@@ -141,6 +127,7 @@ const diario = ref(null)
 const configuraciones = ref(null)
 const perfil = ref(null)
 const logout = ref(null)
+const router = useRouter();
 
 onMounted(async () => {
   await nextTick()
@@ -218,6 +205,52 @@ function calendarioClick() {
     duration: 0.3,
     clearProps: 'backgroundColor',
   })
+}
+
+async function handleLogout() {
+  try {
+    // Confirmación con SweetAlert
+    const result = await Swal.fire({
+      title: '¿Cerrar sesión?',
+      text: '¿Estás seguro de que deseas salir?',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'Sí, cerrar sesión',
+      cancelButtonText: 'Cancelar',
+    });
+
+    if (result.isConfirmed) {
+      // Llamada al servicio de logout
+      await store.dispatch('auth/logout'); // Ajusta según tu estructura de Vuex
+      
+      // Limpieza y redirección
+      localStorage.removeItem('user_free');
+      await router.push('/login');
+      
+      // Animación opcional al cerrar sesión
+      gsap.to(logout.value, {
+        scale: 0.8,
+        opacity: 0,
+        duration: 0.5,
+        onComplete: () => {
+          Swal.fire({
+            title: '¡Hasta pronto!',
+            icon: 'success',
+            timer: 1500,
+            showConfirmButton: false,
+          });
+        },
+      });
+    }
+  } catch (error) {
+    Swal.fire({
+      title: 'Error',
+      text: error.message || 'No se pudo cerrar la sesión',
+      icon: 'error',
+    });
+  }
 }
 </script>
 
