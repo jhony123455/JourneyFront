@@ -18,6 +18,7 @@ const seasonEmojis = {
 }
 
 const spawnEmoji = (emoji) => {
+   if (!loader.value) return;
   const el = document.createElement('span')
   el.classList.add('emoji', seasonClass.value)
   el.textContent = emoji
@@ -42,6 +43,9 @@ const spawnEmoji = (emoji) => {
 }
 
 onMounted(() => {
+   if (emojiInterval.value) {
+    clearInterval(emojiInterval.value)
+  }
   const estaciones = Object.keys(seasonEmojis)
   const random = estaciones[Math.floor(Math.random() * estaciones.length)]
   const { emoji, class: emojiClass } = seasonEmojis[random]

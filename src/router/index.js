@@ -1,16 +1,11 @@
 import { createRouter, createWebHistory } from "vue-router";
-import Dashboard from "../views/Dashboard.vue";
 import Tables from "../views/Tables.vue";
-import Billing from "../views/Billing.vue";
-import RTL from "../views/Rtl.vue";
 import Notifications from "../views/Notifications.vue";
 import Profile from "../views/Profile.vue";
 import SignIn from "../views/SignIn.vue";
 import SignUp from "../views/SignUp.vue";
 import Login from "../views/examples-api/Login.vue";
 import Signup from "../views/examples-api/Signup.vue";
-import PasswordForgot from "../views/examples-api/PasswordForgot.vue";
-import PasswordReset from "../views/examples-api/PasswordReset.vue";
 import UserProfile from "../views/examples-api/profile/UserProfile.vue";
 import Users from "../views/examples-api/users/UsersList.vue";
 import CalendarView from "../views/Calendar/CalendarView.vue";
@@ -22,12 +17,7 @@ const routes = [
     redirect: "/login",
   },
   {
-    path: "/dashboard",
-    name: "Dashboard",
-    component: Dashboard,
-  },
-  {
-    path: "/dashboards/calendario",
+    path: "/calendario",
     name: "Calendario",
     component: CalendarView,
   },
@@ -35,16 +25,6 @@ const routes = [
     path: "/tables",
     name: "Tables",
     component: Tables,
-  },
-  {
-    path: "/billing",
-    name: "Billing",
-    component: Billing,
-  },
-  {
-    path: "/rtl-page",
-    name: "RTL",
-    component: RTL,
   },
   {
     path: "/notifications",
@@ -75,16 +55,6 @@ const routes = [
     path: "/signup",
     name: "Signup",
     component: Signup
-  },
-  {
-    path: "/password-forgot",
-    name: "Password Forgot",
-    component: PasswordForgot
-  },
-  {
-    path: "/password-reset",
-    name: "Password Reset",
-    component: PasswordReset
   },
   {
     path: "/user-profile",

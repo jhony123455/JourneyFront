@@ -1,12 +1,13 @@
 <template>
   <div
+    id="sidenav-collapse-main"
     ref="sidenav"
     class="w-auto h-auto collapse navbar-collapse max-height-vh-100 h-100"
-    id="sidenav-collapse-main"
+    :class="{'collapsed': !$store.state.isPinned}"
   >
     <ul class="navbar-nav">
       <!-- Features Section -->
-      <li class="mt-3 nav-item">
+      <li class="mt-3 nav-item" v-if="$store.state.isPinned">
         <h6
           class="text-xs ps-4 text-uppercase font-weight-bolder text-white"
           :class="$store.state.isRTL ? 'me-4' : 'ms-2'"
@@ -14,70 +15,76 @@
           Features
         </h6>
       </li>
+      <li v-else class="mt-3 nav-item text-center">
+        <div class="separator-mini"></div>
+      </li>
 
       <li
-        class="nav-item"
         ref="calendario"
+        class="nav-item"
         @mouseenter="hoverAnimation($event)"
         @click="calendarioClick"
       >
         <sidenav-collapse
+          nav-text="Calendario"
           url="#"
           :aria-controls="''"
           :collapse="false"
-          collapseRef="calendario"
-          navText="Calendario"
+          collapse-ref="calendario"
         >
-          <template v-slot:icon>
+          <template #icon>
             <i class="material-icons-round opacity-10 fs-5">calendar_today</i>
           </template>
         </sidenav-collapse>
       </li>
 
       <li
-        class="nav-item"
         ref="diario"
+        class="nav-item"
         @mouseenter="hoverAnimation($event)"
       >
         <sidenav-collapse
           url="#"
           :aria-controls="''"
           :collapse="false"
-          collapseRef="diario"
-          navText="Diario"
+          collapse-ref="diario"
+          nav-text="Diario"
         >
-          <template v-slot:icon>
+          <template #icon>
             <i class="material-icons-round opacity-10 fs-5">book</i>
           </template>
         </sidenav-collapse>
       </li>
 
-      <li
-        class="nav-item"
+    <!--   <li
         ref="configuraciones"
+        class="nav-item"
         @mouseenter="hoverAnimation($event)"
       >
         <sidenav-collapse
           url="#"
           :aria-controls="''"
           :collapse="false"
-          collapseRef="configuraciones"
-          navText="Configuraciones"
+          collapse-ref="configuraciones"
+          nav-text="Configuraciones"
         >
-          <template v-slot:icon>
+          <template #icon>
             <i class="material-icons-round opacity-10 fs-5">settings</i>
           </template>
         </sidenav-collapse>
-      </li>
+      </li> -->
 
       <!-- User Section -->
-      <li class="mt-3 nav-item">
+      <li class="mt-3 nav-item" v-if="$store.state.isPinned">
         <h6
           class="text-xs ps-4 text-uppercase font-weight-bolder text-white"
           :class="$store.state.isRTL ? 'me-4' : 'ms-2'"
         >
           Perfiles
         </h6>
+      </li>
+      <li v-else class="mt-3 nav-item text-center">
+        <div class="separator-mini"></div>
       </li>
 
       <li
@@ -89,10 +96,10 @@
           url="#"
           :aria-controls="''"
           :collapse="false"
-          collapseRef="perfil"
-          navText="Perfil"
+          collapse-ref="perfil"
+          nav-text="Perfil"
         >
-          <template v-slot:icon>
+          <template #icon>
             <i class="material-icons-round opacity-10 fs-5">person</i>
           </template>
         </sidenav-collapse>
@@ -107,10 +114,10 @@
           url="#"
           :aria-controls="''"
           :collapse="false"
-          collapseRef="logout"
-          navText="Log Out"
+          collapse-ref="logout"
+          nav-text="Log Out"
         >
-          <template v-slot:icon>
+          <template #icon>
             <i class="material-icons-round opacity-10 fs-5">logout</i>
           </template>
         </sidenav-collapse>
@@ -124,6 +131,7 @@ import { onMounted, ref, nextTick } from 'vue'
 import SidenavCollapse from './SidenavCollapse.vue'
 import gsap from 'gsap'
 import { useStore } from 'vuex'
+
 const store = useStore()
 const sidenav = ref(null)
 
@@ -153,7 +161,6 @@ onMounted(async () => {
   })
 })
 
-
 function hoverAnimation(event) {
   const el = event.currentTarget
   const tl = gsap.timeline({ defaults: { duration: 0.3, ease: 'power2.out' } })
@@ -169,7 +176,6 @@ function hoverAnimation(event) {
   const randomAnim = anims[Math.floor(Math.random() * anims.length)]
   randomAnim()
 }
-
 
 function calendarioClick() {
   const el = calendario.value
@@ -213,7 +219,6 @@ function calendarioClick() {
     clearProps: 'backgroundColor',
   })
 }
-
 </script>
 
 <style scoped>
@@ -228,4 +233,20 @@ function calendarioClick() {
   transform: translateY(-2px);
 }
 
+#sidenav-collapse-main {
+  transition: width 0.3s ease-in-out;
+  width: 250px;
+  overflow-x: hidden;
+}
+
+#sidenav-collapse-main.collapsed {
+  width: 80px;
+}
+
+.separator-mini {
+  height: 1px;
+  background-color: rgba(255, 255, 255, 0.1);
+  width: 60%;
+  margin: 10px auto;
+}
 </style>

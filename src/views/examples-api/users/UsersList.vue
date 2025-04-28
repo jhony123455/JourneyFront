@@ -52,7 +52,7 @@
 <script>
 import MaterialButton from "@/components/MaterialButton.vue";
 import UserItemList from "./UserItemList.vue";
-import showSwal from "@/mixins/showSwal";
+import showSwal from "@/composables/showSwal";
 
 export default {
     name: "UsersList",

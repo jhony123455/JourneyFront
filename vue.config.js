@@ -1,4 +1,3 @@
 module.exports = {
-    transpileDependencies: ['birpc'],
-  }
-  
+  transpileDependencies: ["birpc"],
+};

@@ -55,8 +55,8 @@ import MaterialInput from "@/components/MaterialInput.vue";
 import MaterialButton from "@/components/MaterialButton.vue";
 import MaterialAvatar from "@/components/MaterialAvatar.vue";
 import ValidationError from "@/components/ValidationError.vue";
-import formMixin from "@/mixins/formMixin.js";
-import showSwal from "@/mixins/showSwal.js";
+import formMixin from "@/composables/formMixin.js";
+import showSwal from "@/composables/showSwal.js";
 import _ from "lodash"
 
 export default {
