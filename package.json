@@ -20,6 +20,7 @@
     "dev": "npm run serve"
   },
   "dependencies": {
+    "@element-plus/icons-vue": "^2.3.1",
     "@fullcalendar/core": "^6.1.17",
     "@fullcalendar/daygrid": "^6.1.17",
     "@fullcalendar/interaction": "^6.1.17",
@@ -31,6 +32,7 @@
     "chart.js": "3.6.0",
     "core-js": "3.6.5",
     "dayjs": "^1.11.13",
+    "element-plus": "^2.9.8",
     "gsap": "^3.12.7",
     "jsona": "^1.11.0",
     "quill": "^2.0.3",
