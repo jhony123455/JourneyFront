@@ -2,18 +2,28 @@ import AuthService from '../services/auth.service';
 
 const user = JSON.parse(localStorage.getItem('user_free'));
 const initialState = user ? { loggedIn: true } : { loggedIn: false };
+const stateD = {
+  user: localStorage.getItem('user_free')
+    ? JSON.parse(localStorage.getItem('user_free'))
+    : null,
+  status: localStorage.getItem('user_free')
+    ? { loggedIn: true }
+    : { loggedIn: false }
+};
 
 export const auth = {
   namespaced: true,
-  state: initialState,
+  state: stateD,
   actions: {
-    async login({ commit }, user) {
+    async login({ commit }, userData) {
       try {
-        await AuthService.login(user);
-        commit('isLoggedIn', true);
+        const response = await AuthService.login(userData);
+        commit('loginSuccess', response.data);
+        return response;
       } catch (error) {
-        commit('isLoggedIn', false);
-        throw(error)
+        console.error("Error capturado en acción login:", error);
+        commit('loginFailure');
+        throw error; // Importante: re-lanzamos el error para que handleLogin pueda manejarlo
       }
     },
     async logout({ commit }) {
@@ -43,13 +53,23 @@ export const auth = {
     },
   },
   mutations: {
-    isLoggedIn(state, loggedIn) {
-      state.loggedIn = loggedIn
+    loginSuccess(state, userData) {
+      state.status = { loggedIn: true };
+      state.user = userData;
+    },
+    loginFailure(state) {
+      state.status = { loggedIn: false };
+      state.user = null;
+    },
+    logout(state) {
+      state.status = { loggedIn: false };
+      state.user = null;
     }
   },
   getters: {
     isLoggedIn(state){
       return state.loggedIn;
     }
-  }
+  }, 
+  
 };

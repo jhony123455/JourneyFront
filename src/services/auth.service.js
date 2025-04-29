@@ -4,40 +4,44 @@ import authHeader from "./auth-header";
 const BASE_URL = process.env.VUE_APP_API_BASE_URL;
 
 export default {
-  async login(user) {
+  async login(userData) {
     try {
-      const response = await axios.post(
-        `${BASE_URL}/auth/login`,
-        {
-          name: user.name,
-          password: user.password
+      const response = await axios.post(`${BASE_URL}/auth/login`, userData, {
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
         },
-        {
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          },
-          timeout: 10000 // 10 segundos de timeout
-        }
-      );
-  
-      if (!response.data.token) {
-        throw new Error('No se recibió token en la respuesta');
+        timeout: 10000,
+      });
+      if (response && response.data && response.data.token) {
+        localStorage.setItem("user_free", JSON.stringify(response.data.token));
+        return response;
+      } else {
+        throw new Error("La respuesta no contiene un token");
       }
-  
-      localStorage.setItem("user_free", JSON.stringify(response.data.token));
-      return response.data;
-      
     } catch (error) {
-      if (error.code === 'ECONNABORTED') {
-        throw new Error('Tiempo de espera agotado');
+      console.error("Error en servicio de login:", error);
+      if (error.code === "ECONNABORTED") {
+        throw new Error("Tiempo de espera agotado");
       }
+
+      if (error.response) {
+        const errorMsg =
+          error.response.data?.message ||
+          `Error ${error.response.status}: ${error.response.statusText}`;
+        console.error("Error de respuesta:", errorMsg);
+        throw new Error(errorMsg);
+      } else if (error.request) {
+        console.error("No se recibió respuesta:", error.request);
+        throw new Error("No se recibió respuesta del servidor");
+      }
+
       throw error;
     }
   },
 
   async logout() {
-    await axios.post(BASE_URL + "/logout", {}, { headers: authHeader() });
+    await axios.post(BASE_URL + "/auth/logout", {}, { headers: authHeader() });
     localStorage.removeItem("user_free");
   },
 

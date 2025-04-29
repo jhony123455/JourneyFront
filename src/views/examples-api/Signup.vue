@@ -168,8 +168,8 @@ const handleButtonLeave = () => {
 };
 
 const handleSignup = async (values) => {
-  // Animación de carga
   const submitButton = submitButtonRef.value.$el;
+
   gsap.to(submitButton, {
     scale: 0.95,
     duration: 0.2,
@@ -177,14 +177,10 @@ const handleSignup = async (values) => {
   });
 
   try {
-    // Validación de vee-validate ya se hace antes de ejecutar esta función
-    // Puedes revisar si los datos son válidos
     if (!values || !values.name || !values.password || !values.confirmPassword) {
-      // Manejar el caso en que los campos estén vacíos o inválidos
       return;
     }
 
-    // Verificar si las contraseñas coinciden
     if (values.password !== values.confirmPassword) {
       await Swal.fire({
         icon: 'error',
@@ -195,32 +191,40 @@ const handleSignup = async (values) => {
       return;
     }
 
-    // Realizar el registro llamando a AuthService
     const response = await AuthService.register({
       name: values.name,
       password: values.password,
       password_confirmation: values.confirmPassword,
     });
 
-    // Si el registro es exitoso, redirigir
     await Swal.fire({
       icon: 'success',
       title: '¡Registro exitoso!',
       text: 'Tu cuenta ha sido creada correctamente',
       confirmButtonColor: '#3085d6',
     });
+
     router.push({ name: 'Calendario' }); 
 
   } catch (error) {
-    // Manejo de errores
+    console.error("Error de registro:", error);
+
+    let errorTitle = 'Error de registro';
+    let errorMessage = error?.response?.data?.message || error.message || 'Ocurrió un error al registrar tu cuenta';
+
+    // 🚨 Aquí verificamos si el error es porque ya existe el usuario
+    if (errorMessage.includes('ya está registrado')) {
+      errorTitle = 'Nombre de usuario ya registrado';
+      errorMessage = 'Por favor elige otro nombre de usuario.';
+    }
+
     Swal.fire({
       icon: 'error',
-      title: 'Error de registro',
-      text: error.message || 'Ocurrió un error al registrar tu cuenta',
+      title: errorTitle,
+      text: errorMessage,
       confirmButtonColor: '#3085d6',
     });
   } finally {
-    // Restaurar animación del botón
     gsap.to(submitButton, {
       scale: 1,
       duration: 0.3,
@@ -228,6 +232,7 @@ const handleSignup = async (values) => {
     });
   }
 };
+
 
 </script>
 <template>

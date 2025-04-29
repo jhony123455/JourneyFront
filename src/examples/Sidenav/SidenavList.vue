@@ -234,14 +234,6 @@ async function handleLogout() {
         scale: 0.8,
         opacity: 0,
         duration: 0.5,
-        onComplete: () => {
-          Swal.fire({
-            title: '¡Hasta pronto!',
-            icon: 'success',
-            timer: 1500,
-            showConfirmButton: false,
-          });
-        },
       });
     }
   } catch (error) {

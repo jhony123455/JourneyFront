@@ -1,3 +1,4 @@
+<!-- Componente Vue arreglado -->
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick } from "vue";
 import { useRouter } from "vue-router";
@@ -9,10 +10,12 @@ import MaterialInputField from "@/components/MaterialInputField.vue";
 import MaterialSwitch from "@/components/MaterialSwitch.vue";
 import MaterialButton from "@/components/MaterialButton.vue";
 import showSwal from "@/composables/showSwal";
+import Swal from "sweetalert2";
 
 const router = useRouter();
 const store = useStore();
 const isLoading = ref(false);
+const isRememberMeEnabled = ref(false);
 
 const user = ref({
   name: "",
@@ -75,27 +78,37 @@ onUnmounted(() => {
 const handleLogin = async (values, { resetForm }) => {
   isLoading.value = true;
   try {
-    // Usamos los valores del formulario en lugar de user.value
-    const response = await store.dispatch("auth/login", {
-      name: values.username, // Asegúrate que coincide con el name del input
+    let response = await store.dispatch("auth/login", {
+      name: values.name,
       password: values.password,
+      remember_me: isRememberMeEnabled.value,
     });
+    if (response && response.data && response.data.token) {
+      await Swal.fire({
+        icon: "success",
+        title: "Login exitoso",
+        text: "Bienvenido a Journey",
+        width: 400,
+        confirmButtonColor: "#3085d6",
+      });
 
-    if (response?.token) {
       router.push({ name: "Calendario" });
+    } else {
+      throw new Error("No se recibió token en la respuesta");
     }
   } catch (error) {
-    console.error("Error completo:", error); // Para depuración
-    showSwal({
-      type: "error",
+    console.error("Error completo en login:", error);
+
+    await Swal.fire({
+      icon: "error",
       title: "Error en login",
-      message:
+      text:
         error.response?.data?.message ||
         error.message ||
         "Error al conectar con el servidor",
       width: 500,
+      confirmButtonColor: "#d33",
     });
-    resetForm(); // Limpia el formulario en caso de error
   } finally {
     isLoading.value = false;
   }
@@ -305,17 +318,17 @@ onMounted(() => {
                 :validation-schema="schema"
                 @submit="handleLogin"
               >
-                <div class="mb-3">
+                <div class="mb-3 form-element">
                   <material-input-field
                     id="user"
                     v-model="user.name"
                     label="Usuario"
-                    name="username"
+                    name="name"
                     variant="static"
                     placeholder="Ingrese su usuario"
                   />
                 </div>
-                <div class="mb-3">
+                <div class="mb-3 form-element">
                   <material-input-field
                     id="password"
                     v-model="user.password"
@@ -326,19 +339,24 @@ onMounted(() => {
                     placeholder="Ingrese su Contraseña"
                   />
                 </div>
-                <material-switch id="rememberMe" name="Remember Me"
-                  >Recuerdame</material-switch
-                >
-                <div class="text-center">
+                <div class="form-element">
+                  <material-switch
+                    id="rememberMe"
+                    :checked="isRememberMeEnabled"
+                    name="Remember Me"
+                    @change="isRememberMeEnabled = $event.target.checked"
+                  >
+                    Recuerdame
+                  </material-switch>
+                </div>
+                <div class="text-center form-element">
                   <material-button
                     class="my-4 mb-2"
                     variant="gradient"
                     color="dark"
-                    type="submit"
                     full-width
-                    :disabled="isSubmitting || isLoading"
                   >
-                    <span v-if="!isSubmitting && !isLoading">Ingresa</span>
+                    <span v-if="!isLoading">Ingresa</span>
                     <span v-else>
                       <span
                         class="spinner-border spinner-border-sm"
@@ -348,7 +366,7 @@ onMounted(() => {
                     </span>
                   </material-button>
                 </div>
-                <p class="mt-4 text-sm text-center">
+                <p class="mt-4 text-sm text-center form-element">
                   No tienes cuenta?
                   <router-link
                     :to="{ name: 'Signup' }"
