@@ -1,6 +1,4 @@
 import { createRouter, createWebHistory } from "vue-router";
-import Tables from "../views/Tables.vue";
-import Notifications from "../views/Notifications.vue";
 import Profile from "../views/Profile.vue";
 import SignIn from "../views/SignIn.vue";
 import SignUp from "../views/SignUp.vue";
@@ -9,33 +7,24 @@ import Signup from "../views/examples-api/Signup.vue";
 import UserProfile from "../views/examples-api/profile/UserProfile.vue";
 import Users from "../views/examples-api/users/UsersList.vue";
 import CalendarView from "../views/Calendar/CalendarView.vue";
+import { authGuard } from "./guard.js";
 
 const routes = [
   {
     path: "/",
-    name: "/",
     redirect: "/login",
   },
   {
     path: "/calendario",
     name: "Calendario",
     component: CalendarView,
-    /* meta: { requiresAuth: true }  */
-  },
-  {
-    path: "/tables",
-    name: "Tables",
-    component: Tables,
-  },
-  {
-    path: "/notifications",
-    name: "Notifications",
-    component: Notifications,
+    meta: { requiresAuth: true },
   },
   {
     path: "/profile",
     name: "Profile",
     component: Profile,
+    meta: { requiresAuth: true },
   },
   {
     path: "/sign-in",
@@ -50,22 +39,24 @@ const routes = [
   {
     path: "/login",
     name: "Login",
-    component: Login
+    component: Login,
   },
   {
     path: "/signup",
     name: "Signup",
-    component: Signup
+    component: Signup,
   },
   {
     path: "/user-profile",
     name: "User Profile",
-    component: UserProfile
+    component: UserProfile,
+    meta: { requiresAuth: true },
   },
   {
-    path: '/users',
+    path: "/users",
     name: "Users",
-    component: Users
+    component: Users,
+    meta: { requiresAuth: true },
   }
 ];
 
@@ -74,5 +65,7 @@ const router = createRouter({
   routes,
   linkActiveClass: "active",
 });
+
+router.beforeEach(authGuard);
 
 export default router;

@@ -1,12 +1,12 @@
 import axios from "axios";
 import authHeader from "./auth-header";
 
-const BASE_URL = process.env.VUE_APP_API_BASE_URL;
+/* const BASE_URL = process.env.VUE_APP_API_BASE_URL; */
 
 export default {
   async login(userData) {
     try {
-      const response = await axios.post(`${BASE_URL}/auth/login`, userData, {
+      const response = await axios.post(`/auth/login`, userData, {
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
@@ -41,14 +41,14 @@ export default {
   },
 
   async logout() {
-    await axios.post(BASE_URL + "/auth/logout", {}, { headers: authHeader() });
+    await axios.post("/auth/logout", {}, { headers: authHeader() });
     localStorage.removeItem("user_free");
   },
 
   async register(user) {
     try {
       const response = await axios.post(
-        BASE_URL + "/auth/register",
+        "/auth/register",
         {
           name: user.name,
           password: user.password,
@@ -84,6 +84,34 @@ export default {
       } else {
         throw error;
       }
+    }
+  },
+
+  async checkSession() {
+    const token = localStorage.getItem("user_free");
+
+    if (token) {
+      try {
+        axios.defaults.headers.common["Authorization"] =
+          "Bearer " + JSON.parse(token);
+
+        const response = await axios.get("/auth/me");
+
+        if (response.data) {
+          // Usuario autenticado correctamente
+          console.log("Usuario autenticado:", response.data);
+          // Aquí podrías redirigir a dashboard o cargar datos de usuario
+        }
+      } catch (error) {
+        console.error("Error validando sesión:", error);
+        // Token inválido, redirigir a login y limpiar el storage
+        localStorage.removeItem("user_free");
+        delete axios.defaults.headers.common["Authorization"];
+        // Redirigir a login si quieres
+      }
+    } else {
+      console.log("No hay token en localStorage");
+      // No hay sesión, ir a login
     }
   },
 
