@@ -39,7 +39,7 @@
 
     <!-- Gestionar Etiquetas -->
     <TagManagerModal
-      :show-tag-modal="showTagModal"
+     :show-tag-modal="showTagModal"
       :available-tags="availableTags"
       @close="closeTagModal"
       @delete-tag="deleteTag"

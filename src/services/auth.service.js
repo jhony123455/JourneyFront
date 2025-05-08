@@ -98,9 +98,7 @@ export default {
         const response = await axios.get("/auth/me");
 
         if (response.data) {
-          // Usuario autenticado correctamente
           console.log("Usuario autenticado:", response.data);
-          // Aquí podrías redirigir a dashboard o cargar datos de usuario
         }
       } catch (error) {
         console.error("Error validando sesión:", error);

@@ -7,34 +7,34 @@
     custom-class="tag-manager-dialog"
     @close="handleClose"
   >
-    <!-- Listado de etiquetas -->
-    <div class="space-y-4 mb-8">
+    <!-- Listado de etiquetas del backend -->
+    <div v-loading="apiLoading" class="space-y-4 mb-8">
       <el-card
-        v-for="(tag, index) in localTags"
-        :key="index"
+        v-for="tag in tagStore.availableTags"
+        :key="tag.id"
         shadow="hover"
         class="tag-item"
       >
         <div class="flex items-center gap-3">
           <el-color-picker
-            v-model="localTags[index].color"
+            v-model="tag.color"
             show-alpha
             size="small"
             class="color-picker"
-            @change="saveTags"
+            @change="updateTag(tag)"
           />
           <el-input
-            v-model="localTags[index].name"
+            v-model="tag.name"
             placeholder="Nombre de etiqueta"
             clearable
-            @change="saveTags"
+            @change="updateTag(tag)"
           />
           <el-button
             type="danger"
             plain
             circle
             size="small"
-            @click="deleteTag(index)"
+            @click="removeTag(tag.id)"
           >
             <el-icon><delete /></el-icon>
           </el-button>
@@ -54,73 +54,118 @@
         Agregar
       </el-button>
     </div>
-
-    <template #footer>
-      <span class="dialog-footer">
-        <el-button @click="handleClose">Cerrar</el-button>
-      </span>
-    </template>
   </el-dialog>
 </template>
 
 <script setup>
-import { ref, computed, defineProps, defineEmits } from "vue";
+import { ref, computed, watch, defineProps, defineEmits } from "vue";
 import { Delete } from "@element-plus/icons-vue";
+import useApi from "@/composables/useApi";
+import useTagStore from "@/composables/useTagStore";
 
 const props = defineProps({
   showTagModal: Boolean,
-  availableTags: Array, // Recibimos las etiquetas globales desde el padre
+  availableTags: Array,
 });
 
-const emit = defineEmits(["update-tags", "close"]);
+const emit = defineEmits(["close"]);
+
+const {
+  fetchTags,
+  createTag,
+  deleteTag: apiDeleteTag,
+  updateTag: apiUpdateTag,
+  loading: apiLoading,
+  error: apiError,
+} = useApi();
+
+const tagStore = useTagStore();
 
 // Datos locales
 const newTagName = ref("");
 const newTagColor = ref("#5e72e4");
-const localTags = ref([]);
 
-// Cargar etiquetas al iniciar
-const loadTags = () => {
-  localTags.value = [...props.availableTags];
+const loadTags = async () => {
+  try {
+    const tagsData = await fetchTags();
+    tagStore.availableTags = tagsData;
+  } catch (err) {
+    console.error("Error cargando etiquetas:", err);
+  }
 };
 
-// Guardar etiquetas y emitir al padre
-const saveTags = () => {
-  emit("update-tags", localTags.value); // Emitimos las etiquetas actualizadas
+const addNewTag = async () => {
+  if (!newTagName.value.trim()) return;
+
+  try {
+    const newTag = await createTag({
+      name: newTagName.value.trim(),
+      color: newTagColor.value,
+    });
+    tagStore.availableTags.push(newTag);
+    
+    // eslint-disable-next-line require-atomic-updates
+    newTagName.value = "";
+    // eslint-disable-next-line require-atomic-updates
+    newTagColor.value = "#5e72e4";
+  } catch (err) {
+    console.error("Error creando etiqueta:", err);
+  }
 };
 
-// Añadir nueva etiqueta
-const addNewTag = () => {
-  const newTag = {
-    id: Date.now(), // Usamos el timestamp como ID único
-    name: newTagName.value,
-    color: newTagColor.value,
-  };
-
-  localTags.value.push(newTag);
-  saveTags();
-  newTagName.value = "";
-  newTagColor.value = "#5e72e4";
+const updateTag = async (tag) => {
+  try {
+    await apiUpdateTag(tag.id, {
+      name: tag.name,
+      color: tag.color,
+    });
+  } catch (err) {
+    console.error("Error actualizando etiqueta:", err);
+    await loadTags();
+  }
 };
 
-// Eliminar etiqueta
-const deleteTag = (index) => {
-  localTags.value.splice(index, 1);
-  saveTags();
+const removeTag = async (tagId) => {
+  try {
+    await apiDeleteTag(tagId);
+    
+    // Actualizar el store después de borrar
+    const index = tagStore.availableTags.findIndex(t => t.id === tagId);
+    if (index !== -1) {
+      tagStore.availableTags.splice(index, 1);
+    }
+  } catch (err) {
+    console.error("Error eliminando etiqueta:", err);
+  }
 };
 
-// Control del diálogo
+// Sincronizar con cambios en el padre
+watch(
+  () => props.availableTags,
+  (newTags) => {
+    if (newTags) {
+      tagStore.availableTags = [...newTags];
+    }
+  }
+);
+
 const visible = computed({
   get: () => props.showTagModal,
-  set: (val) => !val && emit("close"),
+  set: (val) => {
+    if (!val) emit("close");
+  },
 });
+
+watch(
+  () => props.showTagModal,
+  (isOpen) => {
+    if (isOpen) loadTags();
+  }
+);
 
 const handleClose = () => {
   emit("close");
 };
-
-// Cargar etiquetas cuando el componente se monta
-loadTags();
 </script>
 
 <style scoped>

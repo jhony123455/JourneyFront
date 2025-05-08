@@ -14,6 +14,15 @@
         />
       </el-form-item>
 
+      <el-form-item label="Descripción">
+        <el-input
+          v-model="localActivity.description"
+          type="textarea"
+          placeholder="Describe brevemente de qué trata esta actividad"
+          :rows="3"
+        />
+      </el-form-item>
+
       <el-form-item label="Color">
         <el-color-picker v-model="localActivity.color" show-alpha />
       </el-form-item>
@@ -50,47 +59,31 @@
         </div>
       </el-form-item>
 
-      <el-form-item v-if="scheduledDate" label="Programar para">
-        <div class="schedule-section">
-          <p class="selected-date">{{ formatDate(scheduledDate) }}</p>
-
-          <el-time-picker
-            v-model="localScheduleTime"
-            format="HH:mm"
-            value-format="HH:mm"
-            placeholder="Hora de inicio"
-            class="time-picker"
-          />
-
-          <el-input-number
-            v-model="eventDuration"
-            :min="15"
-            :step="15"
-            controls-position="right"
-            placeholder="Duración (minutos)"
-            class="duration-input"
-          />
-        </div>
-      </el-form-item>
 
       <div class="form-actions">
         <el-button @click="handleClose">Cancelar</el-button>
         <el-button type="primary" native-type="submit">Guardar</el-button>
+        <el-button v-if="editMode" type="danger" @click="handleDelete">
+          Eliminar
+        </el-button>
       </div>
     </el-form>
   </el-dialog>
 </template>
 
 <script setup>
-import { ref, watch, computed, defineEmits, defineProps } from "vue";
+import { ref, watch, defineEmits, defineProps } from "vue";
 import { ElMessage } from "element-plus";
+import useApi from "@/composables/useApi";
+
+const { createActivity, updateActivity, deleteActivity } = useApi();
 
 const props = defineProps({
   showModal: Boolean,
   editMode: Boolean,
   activity: Object,
   selectedTags: Array,
-  availableTags: Array, // Recibimos las etiquetas globales desde el padre
+  availableTags: Array, 
   scheduledDate: String,
   scheduleTime: String,
   eventDuration: Number,
@@ -106,14 +99,13 @@ const localScheduleTime = ref(props.scheduleTime || "09:00");
 const eventDuration = ref(props.eventDuration || 60);
 const selectedTagId = ref(null);
 
-// Copia profunda de la actividad
 const localActivity = ref({
-  title: "",
-  color: "#5e72e4",
-  ...props.activity,
+  title: props.activity?.title || "",
+  description: props.activity?.description || "",
+  color: props.activity?.color || "#5e72e4",
 });
 
-// Etiquetas seleccionadas locales
+
 const localSelectedTags = ref([...(props.selectedTags || [])]);
 
 // Watchers
@@ -128,14 +120,16 @@ watch(
   () => props.activity,
   (newActivity) => {
     localActivity.value = {
-      title: "",
-      color: "black",
-      ...newActivity,
+      title: newActivity?.title || "",
+      description: newActivity?.description || "",
+      color: newActivity?.color || "#5e72e4",
     };
-    localSelectedTags.value = [...(props.selectedTags || [])];
   },
   { deep: true }
 );
+
+
+
 
 // Methods
 const handleClose = () => {
@@ -143,34 +137,64 @@ const handleClose = () => {
   emit("close");
 };
 
-const handleSubmit = () => {
-  if (!localActivity.value.title) {
-    ElMessage.error("El título es requerido");
+const handleSubmit = async () => {
+  if (
+    !localActivity.value.title 
+  ) {
+    ElMessage.error(
+      "El título es requerido"
+    );
     return;
   }
 
   const activityData = {
-    ...localActivity.value,
-    id:
-      props.editMode && props.activity?.id
-        ? props.activity.id
-        : Date.now().toString(),
-    tags: [...localSelectedTags.value],
-    scheduledDate: props.scheduledDate,
-    scheduleTime: localScheduleTime.value,
-    duration: eventDuration.value,
-    createdAt: new Date().toISOString(),
+    title: localActivity.value.title,
+    description: localActivity.value.description || "",
+    color: localActivity.value.color,
+    tags: localSelectedTags.value.map((tag) => tag.id),
   };
 
-  emit("save", activityData);
+  try {
+    let savedActivity;
 
-  if (!props.editMode) {
-    localActivity.value = { title: "", color: "#5e72e4" };
-    localSelectedTags.value = [];
-    selectedTag.value = null;
+    if (props.editMode && props.activity?.id) {
+      savedActivity = await updateActivity(props.activity.id, activityData);
+    } else {
+      savedActivity = await createActivity(activityData);
+    }
+
+    emit("save", savedActivity);
+
+    if (!props.editMode) {
+      // eslint-disable-next-line require-atomic-updates
+      localActivity.value = {
+        title: "",
+        description: "",
+        color: "#5e72e4",
+      };
+      // eslint-disable-next-line require-atomic-updates
+      localSelectedTags.value = [];
+      selectedTag.value = null;
+    }
+
+    handleClose();
+  } catch (err) {
+    ElMessage.error("No se pudo guardar la actividad");
+    console.error("Error al guardar actividad:", err);
   }
+};
 
-  handleClose();
+const handleDelete = async () => {
+  if (!props.activity?.id) return;
+
+  try {
+    await deleteActivity(props.activity.id);
+    emit("delete", props.activity.id);
+    handleClose();
+  } catch (err) {
+    ElMessage.error("No se pudo eliminar la actividad");
+    console.error("Error al eliminar actividad:", err);
+  }
 };
 
 const addTag = () => {
@@ -191,7 +215,6 @@ const addTag = () => {
 const removeTag = (index) => {
   localSelectedTags.value.splice(index, 1);
 };
-
 </script>
 
 <style scoped>
