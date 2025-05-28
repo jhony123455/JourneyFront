@@ -100,6 +100,7 @@ const eventDuration = ref(props.eventDuration || 60);
 const selectedTagId = ref(null);
 
 const localActivity = ref({
+  id: props.activity?.id || null,
   title: props.activity?.title || "",
   description: props.activity?.description || "",
   color: props.activity?.color || "#5e72e4",
@@ -148,6 +149,7 @@ const handleSubmit = async () => {
   }
 
   const activityData = {
+    id: localActivity.value?.id || null,
     title: localActivity.value.title,
     description: localActivity.value.description || "",
     color: localActivity.value.color,
@@ -168,6 +170,7 @@ const handleSubmit = async () => {
     if (!props.editMode) {
       // eslint-disable-next-line require-atomic-updates
       localActivity.value = {
+        id: null,
         title: "",
         description: "",
         color: "#5e72e4",

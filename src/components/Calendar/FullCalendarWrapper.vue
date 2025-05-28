@@ -29,7 +29,14 @@ import {
   defineExpose,
 } from "vue";
 import { gsap } from "gsap";
+import useApi from "@/composables/useApi";
 
+const {
+  getCalendarEvents,
+  createCalendarEvent,
+  updateCalendarEvent,
+  deleteCalendarEvent,
+} = useApi();
 const props = defineProps({
   calendarReady: Boolean,
   calendarOptions: {
@@ -40,7 +47,6 @@ const props = defineProps({
   },
 });
 const lastEventDateMap = new Map();
-// Mapa para almacenar los colores por fecha
 const cellColorsMap = new Map();
 
 const calendarRef = ref(null);
@@ -60,15 +66,11 @@ const pastelColors = {
 
 // Función mejorada para convertir cualquier color a un tono pastel
 const convertToPastelColor = (color) => {
-  // Si ya es un color pastel predefinido, lo devolvemos
   if (Object.values(pastelColors).includes(color)) {
     console.log("Color predefinido:", color);
     return color;
   }
-
   const colorLower = typeof color === "string" ? color.toLowerCase() : "";
-
-  // Si es un nombre de color conocido, devolver su versión pastel
   if (pastelColors[colorLower]) {
     console.log("Nombre de color a pastel:", pastelColors[colorLower]);
     return pastelColors[colorLower];
@@ -76,7 +78,9 @@ const convertToPastelColor = (color) => {
 
   // Helper: convierte rgb/rgba a objeto { r, g, b }
   function parseRGB(rgbStr) {
-    const matches = rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/i);
+    const matches = rgbStr.match(
+      /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/i
+    );
     if (!matches) return null;
     return {
       r: parseInt(matches[1]),
@@ -84,8 +88,6 @@ const convertToPastelColor = (color) => {
       b: parseInt(matches[3]),
     };
   }
-
-  // Si es rgb o rgba, lo convertimos a pastel
   if (colorLower.startsWith("rgb")) {
     const rgb = parseRGB(colorLower);
     if (rgb) {
@@ -97,12 +99,13 @@ const convertToPastelColor = (color) => {
       return result;
     }
   }
-
-  // Si es hex, extraemos los componentes y promediamos con blanco
   if (colorLower.startsWith("#")) {
     let hex = colorLower.replace("#", "");
     if (hex.length === 3) {
-      hex = hex.split("").map((h) => h + h).join("");
+      hex = hex
+        .split("")
+        .map((h) => h + h)
+        .join("");
     }
     if (hex.length === 6) {
       const r = Math.floor((parseInt(hex.substr(0, 2), 16) + 255) / 2);
@@ -158,8 +161,6 @@ const applySegmentation = (cell, colors, type) => {
   const cellRect = cell.getBoundingClientRect();
   const width = cellRect.width;
   const height = cellRect.height;
-
-  // Restauramos el fondo de la celda a transparente
   gsap.set(cell, { backgroundColor: "rgba(255, 255, 255, 0)" });
 
   switch (type) {
@@ -201,10 +202,10 @@ const applyDiagonalSegmentation = (cell, colors, width, height) => {
       left: 0,
       width: "100%",
       height: "100%",
-      background: `linear-gradient(135deg, 
-        ${color} ${start}%, 
-        ${color} ${(start + end) / 2}%, 
-        transparent ${(start + end) / 2}%, 
+      background: `linear-gradient(135deg,
+        ${color} ${start}%,
+        ${color} ${(start + end) / 2}%,
+        transparent ${(start + end) / 2}%,
         transparent 100%)`,
       opacity: 0,
     });
@@ -281,7 +282,7 @@ const applyCheckeredSegmentation = (cell, colors, width, height) => {
   const gridSize = Math.ceil(Math.sqrt(colors.length));
 
   colors.forEach((color, index) => {
-    if (index >= gridSize * gridSize) return; // Limitamos al tamaño de la cuadrícula
+    if (index >= gridSize * gridSize) return;
 
     const row = Math.floor(index / gridSize);
     const col = index % gridSize;
@@ -323,7 +324,7 @@ const applyRadialSegmentation = (cell, colors, width, height) => {
 
     gsap.set(overlay, {
       position: "absolute",
-      zIndex: colors.length - index, // Asegura que los círculos más pequeños estén encima
+      zIndex: colors.length - index,
       top: "50%",
       left: "50%",
       width: `${percentage}%`,
@@ -343,14 +344,16 @@ const applyRadialSegmentation = (cell, colors, width, height) => {
   });
 };
 
-// Función mejorada para limpiar una celda específica
 const resetDayCellColor = (dateStr) => {
   console.log(`Limpiando celda ${dateStr}`);
-
   const cell = document.querySelector(`[data-date='${dateStr}']`);
-  if (cell) {
-    // Eliminar todos los overlays
-    const existingOverlays = cell.querySelectorAll(".color-overlay");
+
+  if (!cell) {
+    console.warn(`No se encontró celda con fecha ${dateStr}`);
+    return;
+  }
+  const existingOverlays = cell.querySelectorAll(".color-overlay");
+  if (existingOverlays.length > 0) {
     existingOverlays.forEach((overlay) => {
       gsap.to(overlay, {
         opacity: 0,
@@ -358,29 +361,24 @@ const resetDayCellColor = (dateStr) => {
         onComplete: () => overlay.remove(),
       });
     });
-
-    // Eliminar el color de fondo
-    gsap.to(cell, {
-      backgroundColor: "rgba(255, 255, 255, 0)",
-      duration: 0.5,
-      ease: "power2.out",
-    });
-
-    // Eliminar del mapa
+  }
+  gsap.to(cell, {
+    backgroundColor: "transparent",
+    duration: 0.5,
+    ease: "power2.out",
+  });
+  cell.classList.remove("has-color", "has-multiple-colors");
+  if (cellColorsMap) {
     cellColorsMap.delete(dateStr);
   }
 };
 
-// Función mejorada para el manejo de eventos cuando se sueltan en una nueva fecha
 const eventDropHandler = (info) => {
   const oldDate = lastEventDateMap.get(info.event.id);
   const newDate = info.event.startStr;
   const color =
     info.event.extendedProps.color || info.event.backgroundColor || "#e0e0e0";
-
   const pastelColor = convertToPastelColor(color);
-
-  // Eliminar el color antiguo si existe
   if (oldDate && oldDate !== newDate) {
     const oldColors = cellColorsMap.get(oldDate) || [];
     const updatedOldColors = oldColors.filter((c) => c !== pastelColor);
@@ -398,18 +396,14 @@ const eventDropHandler = (info) => {
       }
     }
   }
-
-  // Agregar nuevo color
   mixCellColors(newDate, color);
   lastEventDateMap.set(info.event.id, newDate);
 };
 
-// Actualizar la función de colorDayCell para usar el nuevo sistema de mezcla
 const colorDayCell = (dateStr, color) => {
   mixCellColors(dateStr, color);
 };
 
-// Función para determinar la estación actual basada en el mes
 const getCurrentSeason = (customDate = null) => {
   const date = customDate ? new Date(customDate) : new Date();
   const month = date.getMonth();
@@ -436,10 +430,7 @@ const clearSeasonalElements = (container) => {
 const seasonAnimations = {
   primavera: (container) => {
     clearSeasonalElements(container);
-
     gsap.fromTo(container, { opacity: 0.8 }, { opacity: 1, duration: 0.5 });
-
-    // Flores flotando
     const calendarViewport = container.querySelector(".fc-view-harness");
     if (!calendarViewport) return;
 
@@ -645,21 +636,14 @@ const applySeasonalAnimation = (season = null) => {
     console.error("Contenedor del calendario no encontrado.");
     return;
   }
-
-  // Obtener el elemento del calendario principal para el fondo
   const fcContainer = container.querySelector(".fc");
   if (!fcContainer) {
     console.error("Contenedor FC del calendario no encontrado.");
     return;
   }
-
   const seasonToApply = season || getCurrentSeason();
-
   if (seasonAnimations[seasonToApply]) {
-    // Aplicar animación a todo el contenedor del calendario
     seasonAnimations[seasonToApply](container);
-
-    // Aplicar fondo estacional al contenedor principal del FC
     const seasonBackgrounds = {
       primavera: "linear-gradient(to bottom, #c1dfc4, #deecdd)",
       verano: "linear-gradient(to bottom, #fddb92, #d1fdff)",
@@ -674,8 +658,6 @@ const applySeasonalAnimation = (season = null) => {
     });
   }
 };
-
-// Combinamos las opciones predeterminadas con las proporcionadas
 const mergedCalendarOptions = computed(() => {
   return {
     plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
@@ -694,23 +676,53 @@ const mergedCalendarOptions = computed(() => {
       list: "Lista",
     },
     eventReceive(info) {
-      const color =
-        info.event.extendedProps.color ||
-        info.event.backgroundColor ||
-        "#e0e0e0";
       const dateStr = info.event.startStr;
+      const extendedProps = info.event.extendedProps || {};
 
-      // Usar el nuevo sistema de mezcla de colores
+      const color =
+        extendedProps.color || info.event.backgroundColor || "#e0e0e0";
+
+      const activityId =
+        extendedProps.activityId || (extendedProps.activity || {}).id;
+
+      if (!activityId) {
+        console.warn("No se encontró activityId en el evento");
+        return;
+      }
+
+      const eventData = {
+        title: info.event.title,
+        start_date: dateStr,
+        end_date: info.event.endStr || null,
+        color,
+        activity_id: activityId,
+      };
+
+      // Guardar en la API
+      createCalendarEvent(eventData).catch((error) =>
+        console.error("Error al crear evento en API:", error)
+      );
+
+      // Actualizar interfaz visual
       colorDayCell(dateStr, color);
       lastEventDateMap.set(info.event.id, dateStr);
     },
+
     ...props.calendarOptions,
 
     eventDrop(info) {
       eventDropHandler(info);
-    },
+      const updatedEventData = {
+        id: info.event.id,
+        start_date: info.event.startStr,
+        end_date: info.event.endStr || null,
+      };
 
-    // Agregar un manejador para cuando se elimina un evento
+      updateCalendarEvent(
+        updatedEventData.id,
+        updatedEventData
+      ).catch((error) => console.error("Error al actualizar evento:", error));
+    },
     eventRemove(info) {
       const dateStr = lastEventDateMap.get(info.event.id);
       if (dateStr) {
@@ -723,42 +735,63 @@ const mergedCalendarOptions = computed(() => {
           `Eliminando evento con color ${color} de la fecha ${dateStr}`
         );
 
-        // Eliminar este color específico de la celda
+        // Actualizar interfaz visual
         const colorsForDate = cellColorsMap.get(dateStr);
         if (colorsForDate) {
           const pastelColor = convertToPastelColor(color);
           const newColors = colorsForDate.filter((c) => c !== pastelColor);
-
           if (newColors.length === 0) {
             resetDayCellColor(dateStr);
           } else {
             cellColorsMap.set(dateStr, newColors);
-
-            // Redibujamos la celda con los colores restantes
             const cell = document.querySelector(`[data-date='${dateStr}']`);
             if (cell) {
               const existingOverlays = cell.querySelectorAll(".color-overlay");
               existingOverlays.forEach((overlay) => overlay.remove());
-
               const segmentationType = getSegmentationType(newColors.length);
               applySegmentation(cell, newColors, segmentationType);
             }
           }
         }
 
-        // Eliminar la referencia del evento
+        // Eliminar del backend
+        deleteCalendarEvent(info.event.id).catch((error) =>
+          console.error("Error al eliminar evento:", error)
+        );
+
         lastEventDateMap.delete(info.event.id);
       }
     },
   };
 });
 
-onMounted(() => {
+onMounted(async () => {
   if (props.calendarReady && calendarCard.value) {
+    try {
+      const apiEvents = await getCalendarEvents();
+
+      // Mapear los campos a lo que espera FullCalendar
+      const fcEvents = apiEvents.map((event) => ({
+        id: event.id.toString(),
+        title: event.title,
+        start: event.start_date,
+        end: event.end_date || null,
+        color: event.color || "#e0e0e0",
+        extendedProps: {
+          activityId: event.activity_id,
+          tags: event.tags || [],
+        },
+      }));
+
+      mergedCalendarOptions.value.events = fcEvents;
+    } catch (error) {
+      console.error("No se pudieron cargar los eventos:", error);
+    }
+
     nextTick(() => {
       setTimeout(() => {
         applySeasonalAnimation();
-      }, 500); // Aumentamos el tiempo de espera para asegurar renderizado completo
+      }, 500);
     });
   }
 });
@@ -780,7 +813,6 @@ const changeSeasonManually = (season) => {
   }
 };
 
-// Exportar la función para poder usarla desde componentes padre
 defineExpose({
   changeSeasonManually,
 });
@@ -813,13 +845,11 @@ defineExpose({
   user-select: none;
 }
 
-/* Estilos para la segmentación de colores */
 :deep(.color-overlay) {
-  pointer-events: none; /* Para que los clicks pasen a través */
+  pointer-events: none;
   transition: opacity 0.3s ease;
 }
 
-/* Animación para los overlays */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -829,19 +859,16 @@ defineExpose({
   }
 }
 
-/* Asegurar que la celda pueda posicionar elementos internos correctamente */
 :deep(.fc-daygrid-day) {
   position: relative !important;
   overflow: hidden !important;
 }
 
-/* Mejora para las celdas del día cuando se pasa el mouse */
 :deep(.fc-daygrid-day:hover .color-overlay) {
-  opacity: 0.85 !important; /* Aumenta ligeramente la opacidad al pasar el mouse */
+  opacity: 0.85 !important;
   transition: opacity 0.2s !important;
 }
 
-/* Estilos adicionales para mejorar la visualización de los emojis */
 :deep(.fc-daygrid-day) {
   position: relative;
   transition: background-color 0.3s;
@@ -856,9 +883,7 @@ defineExpose({
 }
 
 :deep(.fc-day-today .color-overlay) {
-  filter: brightness(
-    1.1
-  ) !important; /* Hace que los colores brillen un poco más en el día actual */
+  filter: brightness(1.1) !important;
 }
 
 :deep(.fc) {
@@ -866,16 +891,13 @@ defineExpose({
   overflow: hidden;
   position: relative;
   border-radius: 0.5rem;
-  /* Este overflow hidden mantiene los gradientes dentro del contenedor */
 }
 
 :deep(.fc-view) {
   z-index: 2;
-  /* Asegura que la vista del calendario esté por encima del fondo */
 }
 
 :deep(.fc-header-toolbar) {
-  /* Asegura que la barra de herramientas sea visible */
   position: relative;
   z-index: 3;
   background-color: rgba(255, 255, 255, 0.9);

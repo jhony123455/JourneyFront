@@ -288,6 +288,7 @@ export default function useCalendar() {
       currentActivity.value = null;
       currentActivityId.value = null;
       newActivity.value = {
+        id: null,
         title: "",
         color: "#5e72e4",
         tags: [],

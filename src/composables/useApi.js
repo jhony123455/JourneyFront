@@ -10,12 +10,12 @@ export default function useApi() {
   async function fetchData(endpoint, options = {}) {
     loading.value = true;
     error.value = null;
-    
+
     try {
       const response = await axios({
         url: endpoint,
         headers: getAuthHeaders(),
-        ...options
+        ...options,
       });
       return response.data;
     } catch (err) {
@@ -35,20 +35,20 @@ export default function useApi() {
   async function createTag(tagData) {
     return fetchData("/tags", {
       method: "POST",
-      data: tagData
+      data: tagData,
     });
   }
 
   async function updateTag(id, tagData) {
     return fetchData(`/tags/${id}`, {
       method: "PUT",
-      data: tagData
+      data: tagData,
     });
   }
 
   async function deleteTag(id) {
     return fetchData(`/tags/${id}`, {
-      method: "DELETE"
+      method: "DELETE",
     });
   }
 
@@ -60,22 +60,43 @@ export default function useApi() {
   async function createActivity(activityData) {
     return fetchData("/activities", {
       method: "POST",
-      data: activityData
+      data: activityData,
     });
   }
 
   async function updateActivity(id, activityData) {
     return fetchData(`/activities/${id}`, {
       method: "PUT",
-      data: activityData
+      data: activityData,
     });
   }
 
   async function deleteActivity(id) {
     return fetchData(`/activities/${id}`, {
-      method: "DELETE"
+      method: "DELETE",
     });
   }
+
+  const getCalendarEvents = () => fetchData("/calendar-events");
+
+  const createCalendarEvent = (eventData) =>
+    fetchData("/calendar-events", {
+      method: "POST",
+      data: eventData,
+    });
+
+  const updateCalendarEvent = (id, eventData) =>
+    fetchData(`/calendar-events/${id}`, {
+      method: "PUT",
+      data: eventData,
+    });
+
+  const deleteCalendarEvent = (id) =>
+    fetchData(`/calendar-events/${id}`, {
+      method: "DELETE",
+    });
+
+  const getEventsByActivity = (activityId) => fetchData(`/calendar-events/activity/${activityId}`);
 
   return {
     loading,
@@ -87,6 +108,11 @@ export default function useApi() {
     fetchActivities,
     createActivity,
     updateActivity,
-    deleteActivity
+    deleteActivity,
+    getCalendarEvents,
+    createCalendarEvent,
+    updateCalendarEvent,
+    deleteCalendarEvent,
+    getEventsByActivity,
   };
 }

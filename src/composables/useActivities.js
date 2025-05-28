@@ -3,21 +3,27 @@ import useApi from "./useApi";
 import useAnimation from "./useAnimation";
 import useTags from "./useTags";
 import dayjs from "dayjs";
-import useTagStore from './useTagStore';
+import useTagStore from "./useTagStore";
 
 export default function useActivities() {
   const { selectedTags } = useTagStore();
-  const { fetchActivities, createActivity, updateActivity, deleteActivity } = useApi();
+  const {
+    fetchActivities,
+    createActivity,
+    updateActivity,
+    deleteActivity,
+  } = useApi();
   const { showNotification } = useAnimation();
   const availableActivities = ref([]);
   const scheduledActivities = ref([]);
   const newActivity = ref({
+    id: null,
     title: "",
     description: "",
     color: "#5e72e4",
-    tags: []
+    tags: [],
   });
-  
+
   const currentActivity = ref(null);
   const currentActivityId = ref(null);
   const editMode = ref(false);
@@ -39,42 +45,43 @@ export default function useActivities() {
 
   async function saveActivity() {
     const payload = {
+      id: newActivity.value,
       title: newActivity.value.title,
       description: newActivity.value.description || "",
       color: newActivity.value.color,
-      tags: selectedTags.value.map((tag) => tag.id)
+      tags: selectedTags.value.map((tag) => tag.id),
     };
 
     try {
       if (editMode.value && currentActivityId.value) {
         await updateActivity(currentActivityId.value, payload);
-        
+
         // Actualizar la actividad en la lista local
         const index = availableActivities.value.findIndex(
-          a => a.id === currentActivityId.value
+          (a) => a.id === currentActivityId.value
         );
-        
+
         if (index !== -1) {
           availableActivities.value[index] = {
             ...availableActivities.value[index],
             ...payload,
-            tags: selectedTags.value
+            tags: selectedTags.value,
           };
         }
-        
+
         showNotification("Actividad actualizada correctamente");
       } else {
         const newActivityData = await createActivity(payload);
-        
+
         // Agregar la nueva actividad a la lista local con sus tags
         availableActivities.value.push({
           ...newActivityData,
-          tags: selectedTags.value
+          tags: selectedTags.value,
         });
-        
+
         showNotification("Actividad creada correctamente");
       }
-      
+
       return true;
     } catch (err) {
       showNotification("Error al guardar la actividad", 3000);
@@ -85,13 +92,13 @@ export default function useActivities() {
   async function deleteActivityById(id) {
     try {
       await deleteActivity(id);
-      
+
       // Eliminar la actividad de la lista local
-      const index = availableActivities.value.findIndex(a => a.id === id);
+      const index = availableActivities.value.findIndex((a) => a.id === id);
       if (index !== -1) {
         availableActivities.value.splice(index, 1);
       }
-      
+
       showNotification("Actividad eliminada correctamente");
       return true;
     } catch (err) {
@@ -120,6 +127,6 @@ export default function useActivities() {
     loadActivities,
     saveActivity,
     deleteActivityById,
-    formatDateTime
+    formatDateTime,
   };
 }
