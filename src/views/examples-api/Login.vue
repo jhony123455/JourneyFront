@@ -78,34 +78,29 @@ onUnmounted(() => {
 const handleLogin = async (values, { resetForm }) => {
   isLoading.value = true;
   try {
-    let response = await store.dispatch("auth/login", {
+    const response = await store.dispatch("auth/login", {
       name: values.name,
       password: values.password,
       remember_me: isRememberMeEnabled.value,
     });
-    if (response && response.data && response.data.token) {
-      await Swal.fire({
-        icon: "success",
-        title: "Login exitoso",
-        text: "Bienvenido a Journey",
-        width: 400,
-        confirmButtonColor: "#3085d6",
-      });
 
-      router.push({ name: "Calendario" });
-    } else {
-      throw new Error("No se recibió token en la respuesta");
-    }
+    // La respuesta del backend incluye { message, token, user }
+    await Swal.fire({
+      icon: "success",
+      title: "Login exitoso",
+      text: response.data.message || "Bienvenido a Journey",
+      width: 400,
+      confirmButtonColor: "#3085d6",
+    });
+
+    router.push({ name: "Calendario" });
   } catch (error) {
-    console.error("Error completo en login:", error);
+    console.error("Error en login:", error);
 
     await Swal.fire({
       icon: "error",
       title: "Error en login",
-      text:
-        error.response?.data?.message ||
-        error.message ||
-        "Error al conectar con el servidor",
+      text: error.message || "Error al conectar con el servidor",
       width: 500,
       confirmButtonColor: "#d33",
     });

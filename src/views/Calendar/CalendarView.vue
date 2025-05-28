@@ -1,12 +1,15 @@
 <template>
   <div class="relative">
-    <SeasonLoader v-if="!calendarReady" />
+    <SeasonLoader v-if="!calendarReady || isLoading" />
     
     <FullCalendarWrapper
       v-if="calendarReady"
       ref="calendarRef"
       :calendar-ready="calendarReady"
       :calendar-options="calendarOptions"
+      :available-activities="availableActivities"
+      @show-event-details="handleShowEventDetails"
+      @show-context-menu="handleShowContextMenu"
     />
     
     <FloatingActionButton @click="openAddActivity" />
@@ -18,6 +21,7 @@
       @manage-tags="openTagManager"
       @drag-start="handleDragStart"
       @edit-activity="editActivity"
+      @delete-activity="deleteActivityAndEvents"
     />
     
     <!-- Modal para Agregar/Editar Actividades -->
@@ -25,16 +29,10 @@
       :show-modal="showModal"
       :edit-mode="editMode"
       :activity="currentActivity"
-      :selected-tags="selectedTags"
       :available-tags="availableTags"
-      :scheduled-date="scheduledDate"
-      :schedule-time="scheduleTime"
-      :event-duration="eventDuration"
-      :format-date="formatDate"
       @close="closeModal"
       @save="saveActivityFromModal"
-      @add-tag="addTag"
-      @remove-tag="removeTag"
+      @delete="deleteActivityAndEvents"
     />
 
     <!-- Gestionar Etiquetas -->
@@ -54,11 +52,19 @@
       @duplicate="duplicateSelectedEvent"
       @delete="deleteSelectedEvent"
     />
+
+    <!-- Diálogo de Detalles del Evento -->
+    <EventDetailsDialog
+      v-model="showEventDetails"
+      :event="selectedEventDetails"
+      @delete="handleDeleteFromDetails"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import SeasonLoader from '@/views/components/SeasonLoader.vue';
 import FullCalendarWrapper from '@/components/Calendar/FullCalendarWrapper.vue';
 import FloatingActionButton from '@/components/Calendar/FloatingActionButton.vue';
@@ -66,7 +72,10 @@ import ActivitiesCard from '@/components/Calendar/ActivitiesCard.vue';
 import AddActivityModal from '@/components/Calendar/AddActivityModal.vue';
 import TagManagerModal from '@/components/Calendar/TagManagerModal.vue';
 import ContextMenu from '@/components/Calendar/ContextMenu.vue';
+import EventDetailsDialog from '@/components/Calendar/EventDetailsDialog.vue';
 import useCalendar from '@/composables/useCalendar';
+import useAnimation from '@/composables/useAnimation';
+import useApi from '@/composables/useApi';
 
 const {
   calendarReady,
@@ -83,7 +92,7 @@ const {
   scheduleTime,
   eventDuration,
   availableTags,
-  availableActivities, // Estado reactivo de las actividades
+  availableActivities,
   scheduledEvents,
   newActivity,
   selectedTags,
@@ -107,87 +116,176 @@ const {
   handleDragStart,
   formatDate,
   refreshCalendar,
+  showEventDetails,
+  selectedEventDetails,
+  handleEventEdit,
+  deleteCalendarEvent,
 } = useCalendar();
 
-// Función para guardar una actividad desde el modal
-function saveActivityFromModal(activityData) {
-  if (editMode.value && activityData.id) {
-    // Editar actividad existente
-    const index = availableActivities.value.findIndex(
-      (act) => act.id === activityData.id
-    );
-    if (index !== -1) {
-      availableActivities.value[index] = { ...activityData }; // Actualizar la actividad
-    }
+const { showNotification } = useAnimation();
+const api = useApi();
+const router = useRouter();
 
-    // Actualizar eventos programados relacionados
-    scheduledEvents.value.forEach((event) => {
-      if (event.extendedProps.activityId === activityData.id) {
-        event.title = activityData.title;
-        event.backgroundColor = activityData.color;
-        event.borderColor = activityData.color;
-        event.extendedProps.tags = activityData.tags || []; // Actualizar etiquetas
+// Estado de carga
+const isLoading = ref(false);
+
+const currentActivity = ref(null);
+
+// Función para editar una actividad
+async function editActivity(activity) {
+  try {
+    if (activity?.id) {
+      // Si la actividad tiene un tipo específico, redirigir a su página de edición
+      if (activity.type) {
+        router.push(`/activities/${activity.type}/${activity.id}/edit`);
+        return;
       }
-    });
-  } else {
-    // Agregar nueva actividad
-    availableActivities.value.push(activityData);
+      // Si no tiene tipo, usar el modal genérico
+      currentActivity.value = { ...activity };
+      editMode.value = true;
+      showModal.value = true;
+    }
+  } catch (error) {
+    console.error('Error al editar la actividad:', error);
+    showNotification('Error al editar la actividad: ' + (error.message || 'Error desconocido'), 'error');
+  }
+}
 
-    // Si hay una fecha programada, agregar el evento al calendario
-    if (scheduledDate.value) {
-      const eventStart = `${scheduledDate.value}T${scheduleTime.value}:00`;
-      const startDate = new Date(eventStart);
-      const endDate = new Date(startDate);
-      endDate.setMinutes(startDate.getMinutes() + parseInt(eventDuration.value));
+// Función para guardar una actividad desde el modal
+async function saveActivityFromModal(activityData) {
+  try {
+    isLoading.value = true;
+    let savedActivity;
+    
+  if (editMode.value && activityData.id) {
+      savedActivity = await api.updateActivity(activityData.id, activityData);
+      availableActivities.value = availableActivities.value.map(act => 
+        act.id === savedActivity.id ? savedActivity : act
+      );
+      showNotification(`Actividad "${savedActivity.title}" actualizada correctamente`);
+    } else {
+      savedActivity = await api.createActivity(activityData);
+      availableActivities.value.push(savedActivity);
+      showNotification(`Actividad "${savedActivity.title}" creada correctamente`);
+    }
+    
+    closeModal();
+  } catch (error) {
+    console.error('Error al guardar la actividad:', error);
+    showNotification('Error al guardar la actividad: ' + (error.message || 'Error desconocido'), 'error');
+  } finally {
+    isLoading.value = false;
+  }
+}
 
-      const eventToAdd = {
-        id: `event-${Date.now()}`,
-        title: activityData.title,
-        start: eventStart,
-        end: endDate.toISOString(),
-        backgroundColor: activityData.color,
-        textColor: "#ffffff",
-        extendedProps: {
-          tags: activityData.tags || [], // Incluir las etiquetas seleccionadas
-          activityId: activityData.id,
-        },
-      };
-      scheduledEvents.value.push(eventToAdd);
+// Función para eliminar una actividad y sus eventos
+async function deleteActivityAndEvents(activity) {
+  try {
+    if (!activity?.id) {
+      throw new Error('ID de actividad no válido');
+    }
+    
+    isLoading.value = true;
+    
+    // Primero eliminar la actividad del backend
+    await api.deleteActivity(activity.id);
+    
+    // Actualizar la lista local de actividades
+    availableActivities.value = availableActivities.value.filter(
+      act => act.id !== activity.id
+    );
+
+    // Obtener y eliminar los eventos del calendario
+    if (calendarRef.value?.getApi) {
+      const calendarApi = calendarRef.value.getApi();
+      const events = calendarApi.getEvents();
+      
+      // Filtrar y eliminar eventos relacionados con esta actividad
+      const relatedEvents = events.filter(
+        event => event.extendedProps?.activityId === activity.id
+      );
+      
+      // Eliminar cada evento
+      for (const event of relatedEvents) {
+        await deleteCalendarEvent(event.id);
     }
   }
 
-  // Refrescar el calendario y cerrar el modal
+    // Actualizar el calendario
   refreshCalendar();
-  closeModal();
-}
-
-// Función para abrir el modal en modo edición
-function editActivity(activity) {
-  currentActivityId.value = activity.id;
-  editMode.value = true;
-  newActivity.value = { ...activity }; // Copia profunda de la actividad
-  selectedTags.value = [...(activity.tags || [])]; // Copia profunda de las etiquetas
-  showModal.value = true;
-}
-
-function updateAvailableTags(updatedTags) {
-  availableTags.value = updatedTags; // Actualiza el estado reactivo de las etiquetas
-}
-
-// Función para agregar una etiqueta a una actividad
-function addTagToActivity(tag) {
-  if (!selectedTags.value.some((t) => t.id === tag.id)) {
-    selectedTags.value.push(tag);
+    
+    showNotification(`Actividad "${activity.title}" eliminada correctamente`);
+    closeModal(); // Solo cerrar el modal si la eliminación fue exitosa
+  } catch (error) {
+    console.error('Error al eliminar la actividad:', error);
+    showNotification('Error al eliminar la actividad: ' + (error.message || 'Error desconocido'), 'error');
+  } finally {
+    isLoading.value = false;
   }
 }
 
-// Función para eliminar una etiqueta de una actividad
-function removeTagFromActivity(index) {
-  selectedTags.value.splice(index, 1);
+// Función para manejar la visualización de detalles del evento
+function handleShowEventDetails(event) {
+  selectedEventDetails.value = {
+    id: event.id,
+    title: event.title,
+    description: event.extendedProps?.description || '',
+    color: event.backgroundColor || event.color,
+    tags: event.extendedProps?.tags || [],
+    start: event.start,
+    end: event.end,
+    activity: event.extendedProps?.activity
+  };
+  showEventDetails.value = true;
 }
 
+// Función para manejar el menú contextual
+function handleShowContextMenu(data) {
+  showContextMenu.value = true;
+  contextMenuPosition.value = {
+    x: data.x,
+    y: data.y
+  };
+  selectedEvent.value = data.event;
+}
 
+// Función para manejar la eliminación desde el diálogo de detalles
+async function handleDeleteFromDetails(event) {
+  try {
+    console.log('Evento recibido para eliminar:', event);
+    console.log('ID del evento:', event?.id);
+    console.log('Propiedades extendidas:', event?.extendedProps);
 
+    if (!event?.id) {
+      console.error('ID del evento no válido:', event);
+      showNotification('No se puede eliminar el evento: ID no válido', 'error');
+      return;
+    }
+
+    isLoading.value = true;
+
+    try {
+      // Llamar a la función de eliminación del calendario
+      await deleteCalendarEvent(event.id);
+      console.log('Evento eliminado correctamente');
+      showEventDetails.value = false; // Cerrar el diálogo después de eliminar
+    } catch (error) {
+      console.error('Error detallado al eliminar el evento:', {
+        event,
+        error,
+        errorMessage: error.message,
+        errorResponse: error.response?.data
+      });
+      showNotification('Error al eliminar el evento: ' + (error.response?.data?.message || error.message || 'Error desconocido'), 'error');
+    }
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+onMounted(async () => {
+  // No se necesita cargar actividades desde la API aquí, ya que se maneja en el componente
+});
 
 </script>
 

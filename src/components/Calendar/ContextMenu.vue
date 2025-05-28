@@ -1,10 +1,10 @@
 <template>
   <div
     v-if="showContextMenu"
-    class="context-menu fixed bg-white rounded-lg shadow-lg p-2 z-30"
+    class="context-menu"
     :style="{
-      top: `${contextMenuPosition.y}px`,
       left: `${contextMenuPosition.x}px`,
+      top: `${contextMenuPosition.y}px`
     }"
   >
     <button class="context-menu-item" @click="$emit('edit')">
@@ -24,35 +24,85 @@
 
 <script setup>
 import { defineProps, defineEmits } from 'vue';
-defineProps({
+import dayjs from 'dayjs';
+
+const props = defineProps({
   showContextMenu: Boolean,
   contextMenuPosition: Object,
+  selectedEvent: Object
 });
 
 defineEmits(['edit', 'duplicate', 'delete']);
+
+function formatDate(date) {
+  return dayjs(date).format('DD/MM/YYYY');
+}
 </script>
 
 <style scoped>
 .context-menu {
-  min-width: 180px;
-  border: 1px solid #e5e7eb;
+  position: fixed;
+  background: white;
+  border-radius: 8px;
+  min-width: 200px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.context-menu-header {
+  padding: 8px 16px;
+  background-color: #f3f4f6;
+  font-weight: 500;
+  color: #374151;
+  font-size: 0.875rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.context-menu-content {
+  padding: 4px 0;
 }
 
 .context-menu-item {
+  padding: 8px 16px;
   display: flex;
   align-items: center;
-  width: 100%;
-  padding: 8px 12px;
-  text-align: left;
+  cursor: pointer;
   transition: all 0.2s ease;
-  border-radius: 4px;
+  color: #374151;
+  font-size: 0.875rem;
 }
 
 .context-menu-item:hover {
   background-color: #f3f4f6;
 }
 
-.context-menu-item i {
-  font-size: 16px;
+.context-menu-item.delete {
+  color: #ef4444;
+}
+
+.context-menu-item.delete:hover {
+  background-color: #fef2f2;
+}
+
+.actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.context-menu-item:hover .actions {
+  opacity: 1;
+}
+
+:deep(.el-button--text) {
+  padding: 4px !important;
+  min-height: auto !important;
+}
+
+:deep(.el-button--text:hover) {
+  background-color: #e5e7eb !important;
+  border-radius: 4px;
 }
 </style>

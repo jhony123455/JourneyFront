@@ -1,75 +1,107 @@
 import AuthService from '../services/auth.service';
 
 const user = JSON.parse(localStorage.getItem('user_free'));
-const initialState = user ? { loggedIn: true } : { loggedIn: false };
-const stateD = {
-  user: localStorage.getItem('user_free')
-    ? JSON.parse(localStorage.getItem('user_free'))
-    : null,
-  status: localStorage.getItem('user_free')
-    ? { loggedIn: true }
-    : { loggedIn: false }
+const initialState = {
+  user: user,
+  status: { loggedIn: !!user },
+  token: AuthService.getToken()
 };
 
 export const auth = {
   namespaced: true,
-  state: stateD,
+  state: initialState,
   actions: {
     async login({ commit }, userData) {
       try {
         const response = await AuthService.login(userData);
-        commit('loginSuccess', response.data);
+        const { token, ...userInfo } = response.data;
+        commit('loginSuccess', { user: userInfo, token });
         return response;
       } catch (error) {
         console.error("Error capturado en acción login:", error);
         commit('loginFailure');
-        throw error; // Importante: re-lanzamos el error para que handleLogin pueda manejarlo
+        throw error;
       }
     },
     async logout({ commit }) {
       try {
         await AuthService.logout();
-        commit('isLoggedIn', false);
-      }catch(error){
-        commit('isLoggedIn', true);
+        commit('logout');
+      } catch(error) {
+        console.error("Error en logout:", error);
+        // Aún así limpiamos el estado
+        commit('logout');
       }
     },
     async register({ commit }, user) {
       try {
-        await AuthService.register(user);
-        commit('isLoggedIn', true);
+        const response = await AuthService.register(user);
+        const { token, ...userInfo } = response.data;
+        commit('loginSuccess', { user: userInfo, token });
+        return response;
       } catch (error) {
-        commit('isLoggedIn', false);
-        throw(error)
+        commit('loginFailure');
+        throw error;
       }
     },
-    // eslint-disable-next-line no-unused-vars
-    async passwordForgot({commit}, userEmail){
+    async checkSession({ commit }) {
+      try {
+        const response = await AuthService.checkSession();
+        if (response.data) {
+          commit('loginSuccess', { 
+            user: response.data.user,
+            token: response.data.token 
+          });
+          return response.data;
+        }
+        throw new Error('Invalid session');
+      } catch (error) {
+        commit('loginFailure');
+        throw error;
+      }
+    },
+    async refreshToken({ commit }) {
+      try {
+        const token = await AuthService.refreshToken();
+        commit('updateToken', token);
+        return token;
+      } catch (error) {
+        commit('loginFailure');
+        throw error;
+      }
+    },
+    async passwordForgot({commit}, userEmail) {
       await AuthService.passwordForgot(userEmail);
     },
-    // eslint-disable-next-line no-unused-vars
-    async passwordReset({commit}, passwordDTO){
+    async passwordReset({commit}, passwordDTO) {
       await AuthService.passwordReset(passwordDTO);
     },
   },
   mutations: {
-    loginSuccess(state, userData) {
-      state.status = { loggedIn: true };
-      state.user = userData;
+    loginSuccess(state, { user, token }) {
+      state.status.loggedIn = true;
+      state.user = user;
+      state.token = token;
     },
     loginFailure(state) {
-      state.status = { loggedIn: false };
+      state.status.loggedIn = false;
       state.user = null;
+      state.token = null;
+      AuthService.clearToken();
     },
     logout(state) {
-      state.status = { loggedIn: false };
+      state.status.loggedIn = false;
       state.user = null;
+      state.token = null;
+      AuthService.clearToken();
+    },
+    updateToken(state, token) {
+      state.token = token;
     }
   },
   getters: {
-    isLoggedIn(state){
-      return state.loggedIn;
-    }
-  }, 
-  
+    isLoggedIn: state => state.status.loggedIn,
+    getToken: state => state.token || AuthService.getToken(),
+    getUser: state => state.user
+  }
 };

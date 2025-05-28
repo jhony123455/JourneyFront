@@ -35,6 +35,9 @@ export default function useActivities() {
   const scheduleTime = ref("09:00");
   const activityDuration = ref(60);
 
+  const loading = ref(false);
+  const error = ref(null);
+
   async function loadActivities() {
     try {
       availableActivities.value = await fetchActivities();
@@ -43,51 +46,62 @@ export default function useActivities() {
     }
   }
 
-  async function saveActivity() {
-    const payload = {
-      id: newActivity.value,
-      title: newActivity.value.title,
-      description: newActivity.value.description || "",
-      color: newActivity.value.color,
-      tags: selectedTags.value.map((tag) => tag.id),
-    };
-
+  const saveActivity = async (activityData) => {
+    loading.value = true;
+    error.value = null;
+    
     try {
-      if (editMode.value && currentActivityId.value) {
-        await updateActivity(currentActivityId.value, payload);
+      const savedActivity = await createActivity({
+        title: activityData.title.trim(),
+        description: activityData.description?.trim() || '',
+        color: activityData.color || '#5e72e4',
+        tags: activityData.tags || []
+      });
 
-        // Actualizar la actividad en la lista local
-        const index = availableActivities.value.findIndex(
-          (a) => a.id === currentActivityId.value
-        );
-
-        if (index !== -1) {
-          availableActivities.value[index] = {
-            ...availableActivities.value[index],
-            ...payload,
-            tags: selectedTags.value,
-          };
-        }
-
-        showNotification("Actividad actualizada correctamente");
-      } else {
-        const newActivityData = await createActivity(payload);
-
-        // Agregar la nueva actividad a la lista local con sus tags
-        availableActivities.value.push({
-          ...newActivityData,
-          tags: selectedTags.value,
-        });
-
-        showNotification("Actividad creada correctamente");
+      // En lugar de recargar todas las actividades, solo agregamos la nueva
+      if (savedActivity) {
+        availableActivities.value = [...availableActivities.value, savedActivity];
       }
 
-      return true;
+      return savedActivity;
     } catch (err) {
-      showNotification("Error al guardar la actividad", 3000);
-      return false;
+      console.error('useActivities - Error:', err.message);
+      error.value = err.message || 'Error al guardar la actividad';
+      throw err;
+    } finally {
+      loading.value = false;
     }
-  }
+  };
+
+  const updateExistingActivity = async (id, activityData) => {
+    loading.value = true;
+    error.value = null;
+    
+    try {
+      const updatedActivity = await updateActivity(id, {
+        title: activityData.title.trim(),
+        description: activityData.description?.trim() || '',
+        color: activityData.color || '#5e72e4',
+        tags: activityData.tags || []
+      });
+
+      // Actualizar la actividad en la lista
+      if (updatedActivity) {
+        const index = availableActivities.value.findIndex(a => a.id === id);
+        if (index !== -1) {
+          availableActivities.value[index] = updatedActivity;
+          availableActivities.value = [...availableActivities.value];
+        }
+      }
+
+      return updatedActivity;
+    } catch (err) {
+      error.value = err.message || 'Error al actualizar la actividad';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  };
 
   async function deleteActivityById(id) {
     try {
@@ -126,7 +140,10 @@ export default function useActivities() {
     activityDuration,
     loadActivities,
     saveActivity,
+    updateExistingActivity,
     deleteActivityById,
     formatDateTime,
+    loading,
+    error,
   };
 }

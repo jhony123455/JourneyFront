@@ -7,6 +7,8 @@ import Signup from "../views/examples-api/Signup.vue";
 import UserProfile from "../views/examples-api/profile/UserProfile.vue";
 import Users from "../views/examples-api/users/UsersList.vue";
 import CalendarView from "../views/Calendar/CalendarView.vue";
+import DiaryView from "../views/Diary/DiaryView.vue";
+import NewEntry from "../views/Diary/components/NewEntry.vue";
 import { authGuard } from "./guard.js";
 
 const routes = [
@@ -57,6 +59,19 @@ const routes = [
     name: "Users",
     component: Users,
     meta: { requiresAuth: true },
+  },
+  {
+    path: "/diary",
+    name: "Diary",
+    component: DiaryView,
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: "new",
+        name: "NewEntry",
+        component: NewEntry
+      }
+    ]
   }
 ];
 

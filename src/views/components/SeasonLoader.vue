@@ -3,12 +3,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { gsap } from 'gsap'
 
 const loader = ref(null)
 const seasonClass = ref('')
 const emojiInterval = ref(null)
+const hideTimeout = ref(null)
+const cleanupTimeout = ref(null)
 
 const seasonEmojis = {
   primavera: { emoji: '🌸', class: 'primavera' },
@@ -18,7 +20,7 @@ const seasonEmojis = {
 }
 
 const spawnEmoji = (emoji) => {
-   if (!loader.value) return;
+  if (!loader.value) return;
   const el = document.createElement('span')
   el.classList.add('emoji', seasonClass.value)
   el.textContent = emoji
@@ -37,29 +39,62 @@ const spawnEmoji = (emoji) => {
     duration: Math.random() * 2 + 3,
     ease: 'power1.out',
     onComplete: () => {
-      el.remove()
+      if (el && el.parentNode) {
+        el.remove()
+      }
     }
   })
 }
 
 onMounted(() => {
-   if (emojiInterval.value) {
+  if (emojiInterval.value) {
     clearInterval(emojiInterval.value)
   }
+  
   const estaciones = Object.keys(seasonEmojis)
   const random = estaciones[Math.floor(Math.random() * estaciones.length)]
   const { emoji, class: emojiClass } = seasonEmojis[random]
   seasonClass.value = emojiClass
+  
   emojiInterval.value = setInterval(() => {
-    Array.from({ length: 5 }).forEach(() => spawnEmoji(emoji))
+    if (loader.value) {
+      Array.from({ length: 5 }).forEach(() => spawnEmoji(emoji))
+    }
   }, 300)
 
-  setTimeout(() => {
-    clearInterval(emojiInterval.value)
-    setTimeout(() => {
-      loader.value.style.display = 'none'
-    }, 1000) 
+  hideTimeout.value = setTimeout(() => {
+    if (emojiInterval.value) {
+      clearInterval(emojiInterval.value)
+      emojiInterval.value = null
+    }
+    
+    cleanupTimeout.value = setTimeout(() => {
+      if (loader.value) {
+        loader.value.style.display = 'none'
+      }
+    }, 1000)
   }, 3500)
+})
+
+onBeforeUnmount(() => {
+  // Limpiar todos los temporizadores
+  if (emojiInterval.value) {
+    clearInterval(emojiInterval.value)
+    emojiInterval.value = null
+  }
+  
+  if (hideTimeout.value) {
+    clearTimeout(hideTimeout.value)
+    hideTimeout.value = null
+  }
+  
+  if (cleanupTimeout.value) {
+    clearTimeout(cleanupTimeout.value)
+    cleanupTimeout.value = null
+  }
+  
+  // Detener todas las animaciones GSAP
+  gsap.killTweensOf('*')
 })
 </script>
 

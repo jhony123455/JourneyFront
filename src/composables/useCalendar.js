@@ -1,4 +1,4 @@
-import { ref, computed, onMounted, onUnmounted, nextTick, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted, nextTick, watch, h } from "vue";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
@@ -7,10 +7,13 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import { Draggable } from "@fullcalendar/interaction";
 import gsap from "gsap";
+import { ElMessageBox } from "element-plus";
+import { useRouter } from "vue-router";
 
 import useAnimation from "./useAnimation";
 import useTags from "./useTags";
 import useActivities from "./useActivities";
+import useApi from "./useApi";
 
 export default function useCalendar() {
   dayjs.extend(utc);
@@ -50,6 +53,9 @@ export default function useCalendar() {
     formatDateTime,
   } = useActivities();
 
+  const router = useRouter();
+  const api = useApi();
+
   // Estado del calendario
   const calendarReady = ref(false);
   const calendarRef = ref(null);
@@ -57,21 +63,106 @@ export default function useCalendar() {
   const contextMenuPosition = ref({ x: 0, y: 0 });
   const selectedActivity = ref(null);
   const showTagModal = ref(false);
+  
+  // Control de inicialización
+  const initializationStatus = {
+    state: 'idle',
+    promise: null
+  };
+
+  // Estado para el diálogo de detalles
+  const showEventDetails = ref(false);
+  const selectedEventDetails = ref(null);
+
+  const lastEventDateMap = new Map();
+  const cellColorsMap = new Map();
 
   // Computed
   const formattedActivities = computed(() => {
-    return scheduledActivities.value.map((activity) => {
+    console.log('Formateando actividades. scheduledActivities:', scheduledActivities.value);
+    
+    return scheduledActivities.value.map((calendarEvent) => {
+      const activity = calendarEvent.activity || {};
+      console.log('Formateando evento:', {
+        calendarEventId: calendarEvent.id,
+        activityId: calendarEvent.activity_id,
+        activity: activity
+      });
+      
       return {
-        id: activity.id,
+        id: calendarEvent.id,
         title: activity.title,
-        start: activity.start,
-        end: activity.end,
-        backgroundColor: activity.backgroundColor || "#5e72e4",
-        textColor: activity.textColor || "#ffffff",
-        borderColor: activity.backgroundColor || "#5e72e4",
-        extendedProps: activity.extendedProps || {},
+        start: calendarEvent.start_date,
+        end: calendarEvent.end_date,
+        backgroundColor: activity.color || "#5e72e4",
+        textColor: "#ffffff",
+        borderColor: activity.color || "#5e72e4",
+        allDay: calendarEvent.all_day,
+        extendedProps: {
+          calendarEventId: calendarEvent.id,
+          activityId: calendarEvent.activity_id,
+          activity: activity,
+          description: activity.description,
+          tags: activity.tags || []
+        }
       };
     });
+  });
+
+  // Inicialización única
+  async function initialize() {
+    // Si ya hay una promesa de inicialización, retornarla
+    if (initializationStatus.promise) {
+      return initializationStatus.promise;
+    }
+
+    // Si ya está completado, no hacer nada
+    if (initializationStatus.state === 'completed') {
+      return Promise.resolve();
+    }
+
+    // Crear nueva promesa de inicialización
+    initializationStatus.promise = (async () => {
+      try {
+        initializationStatus.state = 'loading';
+
+        // Cargar datos en paralelo
+        const [activitiesResult, tagsResult] = await Promise.all([
+          loadActivities().catch(error => {
+            console.error('Error cargando actividades:', error);
+            return null;
+          }),
+          loadTags().catch(error => {
+            console.error('Error cargando tags:', error);
+            return null;
+          })
+        ]);
+
+        // Verificar si ambas cargas fueron exitosas
+        if (activitiesResult === null && tagsResult === null) {
+          throw new Error('Error durante la inicialización de datos');
+        }
+
+        calendarReady.value = true;
+        initializationStatus.state = 'completed';
+      } catch (error) {
+        console.error('Error durante la inicialización:', error);
+        initializationStatus.state = 'error';
+        throw error;
+      } finally {
+        // Limpiar la promesa cuando termine
+        initializationStatus.promise = null;
+      }
+    })();
+
+    return initializationStatus.promise;
+  }
+
+  // Cleanup al desmontar
+  onUnmounted(() => {
+    initializationStatus.state = 'idle';
+    initializationStatus.promise = null;
+    calendarReady.value = false;
   });
 
   function openTagManager() {
@@ -115,7 +206,9 @@ export default function useCalendar() {
     selectable: true,
     dayMaxEvents: true,
     droppable: true,
-    events: formattedActivities,
+    events: function(info, successCallback, failureCallback) {
+      successCallback(formattedActivities.value);
+    },
     datesSet() {
       animateTearSheet();
     },
@@ -151,14 +244,43 @@ export default function useCalendar() {
     drop: handleDrop,
     eventDrop: handleActivityDrop,
     eventResize: handleActivityResize,
+    eventDidMount: function(info) {
+      // Agregar tooltip con descripción
+      if (info.event.extendedProps.description) {
+        const tooltip = document.createElement('div');
+        tooltip.className = 'calendar-tooltip';
+        tooltip.innerHTML = info.event.extendedProps.description;
+        document.body.appendChild(tooltip);
+
+        const eventEl = info.el;
+        eventEl.addEventListener('mouseover', function() {
+          const rect = eventEl.getBoundingClientRect();
+          tooltip.style.display = 'block';
+          tooltip.style.left = rect.left + window.scrollX + 'px';
+          tooltip.style.top = rect.bottom + window.scrollY + 'px';
+        });
+
+        eventEl.addEventListener('mouseout', function() {
+          tooltip.style.display = 'none';
+        });
+
+        info.event.setExtendedProp('tooltip', tooltip);
+      }
+    },
+    eventDestroy: function(info) {
+      // Limpiar tooltip al destruir evento
+      if (info.event.extendedProps.tooltip) {
+        info.event.extendedProps.tooltip.remove();
+      }
+    }
   };
 
   // Métodos
   function refreshCalendar() {
-    if (calendarRef.value && calendarRef.value.getApi) {
-      const calendarApi = calendarRef.value.getApi();
-      calendarApi.refetchEvents();
-    }
+    if (!calendarRef.value || !calendarRef.value.getApi) return;
+    
+    const calendarApi = calendarRef.value.getApi();
+    calendarApi.refetchEvents();
   }
 
   function formatDate(date) {
@@ -167,13 +289,32 @@ export default function useCalendar() {
   }
 
   function handleActivityClick(info) {
-    selectedActivity.value = info.event;
-    const rect = info.el.getBoundingClientRect();
-    contextMenuPosition.value = {
-      x: rect.right + 5,
-      y: rect.top,
+    const event = info.event;
+    const activity = event.extendedProps?.activity || {};
+    
+    console.log('Click en evento:', {
+      event: event,
+      extendedProps: event.extendedProps,
+      activity: activity
+    });
+    
+    // Guardar los detalles del evento seleccionado
+    selectedEventDetails.value = {
+      id: event.extendedProps?.calendarEventId || event.id,
+      title: activity.title || event.title,
+      description: activity.description || event.extendedProps?.description || '',
+      color: activity.color || event.backgroundColor,
+      tags: event.extendedProps?.tags || [],
+      start: event.start,
+      end: event.end,
+      activity: activity,
+      extendedProps: event.extendedProps
     };
-    showContextMenu.value = true;
+
+    console.log('Detalles del evento seleccionado:', selectedEventDetails.value);
+
+    // Mostrar el diálogo
+    showEventDetails.value = true;
     info.jsEvent.preventDefault();
   }
 
@@ -183,12 +324,17 @@ export default function useCalendar() {
       .tz("America/Bogota")
       .format("YYYY-MM-DD");
 
-    // Asignar la fecha ajustada
+    // Asignar la fecha ajustada y hora actual redondeada a 30 minutos
+    const now = new Date();
+    const minutes = now.getMinutes();
+    const roundedMinutes = minutes < 30 ? "00" : "30";
+    const hours = now.getHours().toString().padStart(2, "0");
+    
     scheduledDate.value = colombiaDate;
-    scheduleTime.value = "09:00";
+    scheduleTime.value = `${hours}:${roundedMinutes}`;
     activityDuration.value = 60;
 
-    // Abrir el modal de agregar actividad
+    // Abrir el modal de agregar actividad con la fecha seleccionada
     openAddActivity(null, colombiaDate);
   }
 
@@ -295,9 +441,13 @@ export default function useCalendar() {
       };
       selectedTags.value = [];
 
-      // Establecer fecha si se proporciona
-      scheduledDate.value = date || "";
-      scheduleTime.value = "09:00";
+      // Establecer fecha y hora solo si se proporciona una fecha
+      if (date) {
+        scheduledDate.value = date;
+      } else {
+        scheduledDate.value = "";
+        scheduleTime.value = "09:00";
+      }
       activityDuration.value = 60;
     }
 
@@ -306,46 +456,51 @@ export default function useCalendar() {
   }
 
   function closeModal() {
-    animateModalClose(modalRef, () => {
-      showModal.value = false;
-      editMode.value = false;
-      currentActivityId.value = null;
-      scheduledDate.value = "";
-    });
+    showModal.value = false;
+    editMode.value = false;
+    currentActivity.value = null;
   }
 
-  function editSelectedActivity() {
-    if (selectedActivity.value) {
-      const activity = selectedActivity.value;
-      const activityId = activity.extendedProps.activityId;
+  function editSelectedActivity(activity) {
+    if (activity) {
+      editMode.value = true;
+      currentActivity.value = activity;
+      currentActivityId.value = activity.id;
+      newActivity.value = {
+        title: activity.title || "",
+        color: activity.color || "#5e72e4",
+        tags: [],
+      };
 
-      if (activityId) {
-        const activityObj = availableActivities.value.find(
-          (a) => a.id === activityId
-        );
-        if (activityObj) {
-          openAddActivity(activityObj);
-        } else {
-          const activityData = {
-            id: activityId,
-            title: activity.title,
-            color: activity.backgroundColor,
-            tags: activity.extendedProps.tags || [],
-          };
-          openAddActivity(activityData);
-        }
-      } else {
-        const activityData = {
-          id: `temp-${Date.now()}`,
-          title: activity.title,
-          color: activity.backgroundColor,
-          tags: activity.extendedProps.tags || [],
-        };
-        openAddActivity(activityData);
+      // Cargar etiquetas seleccionadas
+      selectedTags.value = activity.tags || [];
+
+      // Cargar fecha y hora si existen
+      scheduledDate.value = activity.scheduledDate || "";
+      scheduleTime.value = activity.scheduleTime || "09:00";
+      activityDuration.value = activity.duration || 60;
+    } else {
+      editMode.value = false;
+      currentActivity.value = null;
+      currentActivityId.value = null;
+      newActivity.value = {
+        id: null,
+        title: "",
+        color: "#5e72e4",
+        tags: [],
+      };
+      selectedTags.value = [];
+
+      // Establecer fecha y hora solo si se proporciona una fecha
+      if (scheduledDate.value) {
+        scheduledDate.value = "";
+        scheduleTime.value = "09:00";
       }
-
-      showContextMenu.value = false;
+      activityDuration.value = 60;
     }
+
+    showModal.value = true;
+    animateModalOpen(modalRef);
   }
 
   function duplicateSelectedActivity() {
@@ -369,16 +524,41 @@ export default function useCalendar() {
     }
   }
 
-  function deleteSelectedActivity() {
+  async function deleteSelectedActivity() {
     if (selectedActivity.value) {
-      const activityId = selectedActivity.value.id;
-      const activityIndex = scheduledActivities.value.findIndex(
-        (e) => e.id === activityId
-      );
-      if (activityIndex !== -1) {
-        scheduledActivities.value.splice(activityIndex, 1);
-        refreshCalendar();
-        showNotification("Actividad eliminada");
+      try {
+        // Si es un evento del calendario
+        if (selectedActivity.value.events) {
+          const event = selectedActivity.value.events[0];
+          if (event && event.id) {
+            await deleteCalendarEvent(event.id);
+            showNotification("Actividad eliminada del calendario");
+          }
+        } else {
+          // Si es una actividad de la lista
+          const activityId = selectedActivity.value.id;
+          if (activityId) {
+            // Eliminar la actividad de la lista
+            availableActivities.value = availableActivities.value.filter(
+              (a) => a.id !== activityId
+            );
+            
+            // Eliminar todos los eventos relacionados del calendario
+            const eventsToDelete = scheduledActivities.value.filter(
+              (event) => event.extendedProps?.activityId === activityId
+            );
+            
+            // Eliminar cada evento individualmente
+            for (const event of eventsToDelete) {
+              await deleteCalendarEvent(event.id);
+            }
+            
+            showNotification("Actividad eliminada completamente");
+          }
+        }
+      } catch (error) {
+        console.error('Error al eliminar la actividad:', error);
+        showNotification("Error al eliminar la actividad", "error");
       }
       showContextMenu.value = false;
     }
@@ -453,18 +633,272 @@ export default function useCalendar() {
     });
   }
 
+  function closeEventDetails() {
+    showEventDetails.value = false;
+    selectedEventDetails.value = null;
+  }
+
+  function handleEditActivity() {
+    if (selectedEventDetails.value?.activity) {
+      editSelectedActivity(selectedEventDetails.value.activity);
+      closeEventDetails();
+    }
+  }
+
+  // Función para editar una actividad específica
+  function editActivity(activity) {
+    if (!activity) return;
+    
+    try {
+      // Si la actividad tiene un tipo específico, redirigir a su página de edición
+      if (activity.type) {
+        router.push(`/activities/${activity.type}/${activity.id}/edit`);
+        return;
+      }
+      
+      // Si no tiene tipo, usar el modal genérico de edición
+      editMode.value = true;
+      currentActivity.value = { ...activity };
+      currentActivityId.value = activity.id;
+      
+      // Asegurarse de que el color se pase correctamente
+      const activityColor = activity.color || activity.backgroundColor || "#5e72e4";
+      
+      newActivity.value = {
+        title: activity.title || "",
+        color: activityColor,
+        description: activity.description || "",
+        tags: activity.tags || [],
+      };
+
+      // Cargar etiquetas seleccionadas
+      selectedTags.value = activity.tags || [];
+
+      // Cargar fecha y hora si existen
+      if (activity.start) {
+        const startDate = dayjs(activity.start);
+        scheduledDate.value = startDate.format('YYYY-MM-DD');
+        scheduleTime.value = startDate.format('HH:mm');
+        
+        if (activity.end) {
+          const duration = dayjs(activity.end).diff(startDate, 'minutes');
+          activityDuration.value = duration || 60;
+        } else {
+          activityDuration.value = 60;
+        }
+      }
+
+      showModal.value = true;
+      if (modalRef.value) {
+        animateModalOpen(modalRef.value);
+      }
+    } catch (error) {
+      console.error('Error al editar la actividad:', error);
+      showNotification('Error al editar la actividad: ' + (error.message || 'Error desconocido'), 'error');
+    }
+  }
+
+  // Función para manejar la edición desde los detalles del evento
+  async function handleEventEdit(event) {
+    try {
+      if (!event) return;
+      
+      // Cerrar el diálogo de detalles
+      showEventDetails.value = false;
+      
+      // Si el evento tiene una actividad asociada
+      if (event.extendedProps?.activity) {
+        editActivity(event.extendedProps.activity);
+      }
+    } catch (error) {
+      console.error('Error al editar desde detalles:', error);
+      showNotification('Error al editar la actividad: ' + (error.message || 'Error desconocido'), 'error');
+    }
+  }
+
+  // Función para convertir a color pastel (si no existe)
+  const convertToPastelColor = (color) => {
+    if (!color) return "#e0e0e0";
+    // Si ya es un color pastel, devolverlo
+    if (color.match(/^rgba?\(\d+,\s*\d+,\s*\d+,\s*0\.\d+\)/)) return color;
+    
+    // Convertir a RGB si es HEX
+    let r, g, b;
+    if (color.startsWith("#")) {
+      const hex = color.replace("#", "");
+      r = parseInt(hex.substr(0, 2), 16);
+      g = parseInt(hex.substr(2, 2), 16);
+      b = parseInt(hex.substr(4, 2), 16);
+    } else if (color.startsWith("rgb")) {
+      const matches = color.match(/\d+/g);
+      [r, g, b] = matches;
+    } else {
+      return "#e0e0e0";
+    }
+    
+    // Convertir a pastel
+    r = Math.floor((parseInt(r) + 255) / 2);
+    g = Math.floor((parseInt(g) + 255) / 2);
+    b = Math.floor((parseInt(b) + 255) / 2);
+    
+    return `rgb(${r}, ${g}, ${b})`;
+  };
+
+  // Función para obtener el tipo de segmentación
+  const getSegmentationType = (colorCount) => {
+    const types = ["diagonal", "horizontal", "vertical", "checkered", "radial"];
+    return types[colorCount % types.length];
+  };
+
+  // Función para aplicar segmentación
+  const applySegmentation = (cell, colors, type) => {
+    if (!cell || !colors || !type) return;
+    
+    const cellRect = cell.getBoundingClientRect();
+    const width = cellRect.width;
+    const height = cellRect.height;
+    
+    // Limpiar overlays existentes
+    const existingOverlays = cell.querySelectorAll(".color-overlay");
+    existingOverlays.forEach(overlay => overlay.remove());
+    
+    // Aplicar nuevo color
+    colors.forEach((color, index) => {
+      const overlay = document.createElement("div");
+      overlay.classList.add("color-overlay");
+      overlay.style.position = "absolute";
+      overlay.style.top = "0";
+      overlay.style.left = "0";
+      overlay.style.width = "100%";
+      overlay.style.height = "100%";
+      overlay.style.backgroundColor = color;
+      overlay.style.opacity = "0.5";
+      cell.appendChild(overlay);
+    });
+  };
+
+  // Función para resetear el color de una celda
+  const resetDayCellColor = (dateStr) => {
+    const cell = document.querySelector(`[data-date='${dateStr}']`);
+    if (!cell) return;
+    
+    const existingOverlays = cell.querySelectorAll(".color-overlay");
+    existingOverlays.forEach(overlay => {
+      overlay.remove();
+    });
+    
+    cell.style.backgroundColor = "";
+    if (cellColorsMap.has(dateStr)) {
+      cellColorsMap.delete(dateStr);
+    }
+  };
+
+  // Función para eliminar un evento del calendario
+  async function deleteCalendarEvent(calendarEventId) {
+    try {
+      // Primero eliminar del backend
+      await api.deleteCalendarEvent(calendarEventId);
+      
+      // Actualizar el estado local inmediatamente
+      scheduledActivities.value = scheduledActivities.value.filter(
+        event => event.id !== calendarEventId
+      );
+
+      // Obtener la instancia del calendario y actualizar directamente
+      if (calendarRef.value && calendarRef.value.getApi) {
+        const calendarApi = calendarRef.value.getApi();
+        
+        // Encontrar y eliminar el evento específico
+        const eventToRemove = calendarApi.getEventById(calendarEventId);
+        if (eventToRemove) {
+          // Guardar la fecha del evento antes de eliminarlo para limpiar los colores
+          const eventDate = dayjs(eventToRemove.start).format('YYYY-MM-DD');
+          
+          // Eliminar el evento del calendario
+          eventToRemove.remove();
+          
+          // Limpiar los colores de la celda si es necesario
+          if (lastEventDateMap.has(calendarEventId)) {
+            const dateStr = lastEventDateMap.get(calendarEventId);
+            const colorsForDate = cellColorsMap.get(dateStr);
+            if (colorsForDate) {
+              const color = eventToRemove.backgroundColor || eventToRemove.color || "#e0e0e0";
+              const pastelColor = convertToPastelColor(color);
+              const newColors = colorsForDate.filter(c => c !== pastelColor);
+              
+              if (newColors.length === 0) {
+                resetDayCellColor(dateStr);
+              } else {
+                cellColorsMap.set(dateStr, newColors);
+                const cell = document.querySelector(`[data-date='${dateStr}']`);
+                if (cell) {
+                  const existingOverlays = cell.querySelectorAll(".color-overlay");
+                  existingOverlays.forEach(overlay => overlay.remove());
+                  const segmentationType = getSegmentationType(newColors.length);
+                  applySegmentation(cell, newColors, segmentationType);
+                }
+              }
+            }
+            lastEventDateMap.delete(calendarEventId);
+          }
+        }
+        
+        // Forzar una actualización completa del calendario
+        await nextTick(() => {
+          calendarApi.refetchEvents();
+        });
+      }
+      
+      showNotification('Evento eliminado del calendario correctamente');
+      return true;
+    } catch (error) {
+      console.error('Error al eliminar el evento:', error);
+      showNotification('Error al eliminar el evento', 'error');
+      throw error;
+    }
+  }
+
+  // Función para cargar los eventos del calendario
+  async function loadCalendarEvents() {
+    try {
+      const events = await api.getCalendarEvents();
+      scheduledActivities.value = events || [];
+
+      if (calendarRef.value && calendarRef.value.getApi) {
+        const calendarApi = calendarRef.value.getApi();
+        calendarApi.removeAllEvents();
+        calendarApi.addEventSource(formattedActivities.value);
+      }
+    } catch (error) {
+      showNotification('Error al cargar los eventos del calendario', 'error');
+    }
+  }
+
+  // Watcher para actualizar el calendario cuando cambian las actividades
+  watch(scheduledActivities, () => {
+    if (calendarRef.value && calendarRef.value.getApi) {
+      const calendarApi = calendarRef.value.getApi();
+      calendarApi.removeAllEvents();
+      calendarApi.addEventSource(formattedActivities.value);
+    }
+  }, { deep: true });
+
   // Lifecycle hooks
   onMounted(() => {
-    // Cargar datos
-    loadTags();
-    loadActivities();
+    // Iniciar carga de datos
+    initialize().then(() => {
+      loadCalendarEvents(); // Cargar los eventos del calendario después de la inicialización
+    }).catch(error => {
+      console.error('Error en la inicialización del calendario:', error);
+    });
 
     setTimeout(() => {
-      calendarReady.value = true;
       nextTick(() => {
-        refreshCalendar();
-        animateCalendarLoad(".calendar-fade-enter-active");
-        initDraggableActivities();
+        if (initializationStatus.state === 'completed') {
+          refreshCalendar();
+          animateCalendarLoad(".calendar-fade-enter-active");
+          initDraggableActivities();
+        }
       });
     }, 1000);
 
@@ -525,5 +959,26 @@ export default function useCalendar() {
 
     // Acciones de actividad
     saveActivity,
+
+    // Estado para el diálogo de detalles
+    showEventDetails,
+    selectedEventDetails,
+    closeEventDetails,
+    handleEditActivity,
+
+    // Nuevo estado
+    currentActivity,
+
+    // Función para manejar la edición desde los detalles del evento
+    handleEventEdit,
+
+    // Función para editar una actividad específica
+    editActivity,
+
+    // Función para eliminar un evento del calendario
+    deleteCalendarEvent,
+
+    // Función para cargar los eventos del calendario
+    loadCalendarEvents,
   };
 }

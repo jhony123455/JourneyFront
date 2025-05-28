@@ -1,265 +1,197 @@
 <template>
   <el-dialog
-    v-model="dialogVisible"
-    :title="editMode ? 'Editar actividad' : 'Agregar nueva actividad'"
-    width="500px"
-    align-center
+    :title="editMode ? 'Editar actividad' : 'Nueva actividad'"
+    :modelValue="showModal"
     @close="handleClose"
+    width="500px"
   >
-    <el-form @submit.prevent="handleSubmit">
-      <el-form-item label="Título" required>
-        <el-input
-          v-model="localActivity.title"
-          placeholder="Título de la actividad"
-        />
+    <el-form
+      ref="formRef"
+      :model="activityForm"
+      :rules="rules"
+      label-position="top"
+    >
+      <el-form-item label="Título" prop="title" required>
+        <el-input v-model="activityForm.title" placeholder="Título de la actividad" />
       </el-form-item>
 
-      <el-form-item label="Descripción">
+      <el-form-item label="Descripción" prop="description">
         <el-input
-          v-model="localActivity.description"
+          v-model="activityForm.description"
           type="textarea"
-          placeholder="Describe brevemente de qué trata esta actividad"
           :rows="3"
+          placeholder="Describe brevemente de qué trata esta actividad"
         />
       </el-form-item>
 
-      <el-form-item label="Color">
-        <el-color-picker v-model="localActivity.color" show-alpha />
+      <el-form-item label="Color" prop="color" required>
+        <el-color-picker v-model="activityForm.color" />
       </el-form-item>
 
       <el-form-item label="Etiquetas (opcional)">
-        <div class="tag-container">
-          <el-tag
-            v-for="(tag, index) in localSelectedTags"
-            :key="tag.id"
-            :color="tag.color"
-            closable
-            @close="removeTag(index)"
-          >
-            {{ tag.name }}
-          </el-tag>
-        </div>
-        <div class="tag-selector">
+        <div class="flex items-center gap-2">
           <el-select
-            v-model="selectedTagId"
+            v-model="selectedTag"
             placeholder="Seleccionar etiqueta"
-            class="tag-select"
-            filterable
+            clearable
+            class="flex-1"
           >
             <el-option
               v-for="tag in availableTags"
               :key="tag.id"
               :label="tag.name"
-              :value="tag.id"
-            />
+              :value="tag"
+            >
+              <span
+                class="inline-block w-3 h-3 rounded-full mr-2"
+                :style="{ backgroundColor: tag.color }"
+              ></span>
+              {{ tag.name }}
+            </el-option>
           </el-select>
-          <el-button type="primary" :disabled="!selectedTagId" @click="addTag">
-            Añadir
-          </el-button>
+          <el-button type="primary" @click="addSelectedTag">Añadir</el-button>
+        </div>
+        <div v-if="activityForm.tags.length > 0" class="mt-2 flex flex-wrap gap-2">
+          <el-tag
+            v-for="tag in activityForm.tags"
+            :key="tag.id"
+            closable
+            :style="{ backgroundColor: tag.color }"
+            @close="removeTag(tag)"
+          >
+            {{ tag.name }}
+          </el-tag>
         </div>
       </el-form-item>
+    </el-form>
 
-
-      <div class="form-actions">
-        <el-button @click="handleClose">Cancelar</el-button>
-        <el-button type="primary" native-type="submit">Guardar</el-button>
-        <el-button v-if="editMode" type="danger" @click="handleDelete">
+    <template #footer>
+      <div class="dialog-footer flex justify-between">
+        <div>
+          <el-button @click="handleClose">Cancelar</el-button>
+          <el-button type="primary" @click="handleSubmit">
+            {{ editMode ? 'Guardar cambios' : 'Crear actividad' }}
+          </el-button>
+        </div>
+        <el-button 
+          v-if="editMode" 
+          type="danger" 
+          @click="handleDelete"
+        >
           Eliminar
         </el-button>
       </div>
-    </el-form>
+    </template>
   </el-dialog>
 </template>
 
 <script setup>
-import { ref, watch, defineEmits, defineProps } from "vue";
-import { ElMessage } from "element-plus";
-import useApi from "@/composables/useApi";
-
-const { createActivity, updateActivity, deleteActivity } = useApi();
+import { ref, defineProps, defineEmits, watch } from 'vue';
 
 const props = defineProps({
   showModal: Boolean,
   editMode: Boolean,
-  activity: Object,
-  selectedTags: Array,
-  availableTags: Array, 
-  scheduledDate: String,
-  scheduleTime: String,
-  eventDuration: Number,
-  formatDate: Function,
-});
-
-const emit = defineEmits(["close", "save", "add-tag", "remove-tag"]);
-
-// Reactive state
-const dialogVisible = ref(props.showModal);
-const selectedTag = ref(null);
-const localScheduleTime = ref(props.scheduleTime || "09:00");
-const eventDuration = ref(props.eventDuration || 60);
-const selectedTagId = ref(null);
-
-const localActivity = ref({
-  id: props.activity?.id || null,
-  title: props.activity?.title || "",
-  description: props.activity?.description || "",
-  color: props.activity?.color || "#5e72e4",
-});
-
-
-const localSelectedTags = ref([...(props.selectedTags || [])]);
-
-// Watchers
-watch(
-  () => props.showModal,
-  (val) => {
-    dialogVisible.value = val;
-  }
-);
-
-watch(
-  () => props.activity,
-  (newActivity) => {
-    localActivity.value = {
-      title: newActivity?.title || "",
-      description: newActivity?.description || "",
-      color: newActivity?.color || "#5e72e4",
-    };
+  activity: {
+    type: Object,
+    default: () => ({})
   },
-  { deep: true }
-);
+  availableTags: {
+    type: Array,
+    default: () => []
+  }
+});
 
+const emit = defineEmits(['close', 'save', 'delete']);
 
+const formRef = ref(null);
+const selectedTag = ref(null);
 
+const activityForm = ref({
+  title: '',
+  description: '',
+  color: '#5e72e4',
+  tags: []
+});
 
-// Methods
-const handleClose = () => {
-  dialogVisible.value = false;
-  emit("close");
+const rules = {
+  title: [
+    { required: true, message: 'Por favor ingrese un título', trigger: 'blur' },
+    { min: 3, message: 'El título debe tener al menos 3 caracteres', trigger: 'blur' }
+  ],
+  color: [
+    { required: true, message: 'Por favor seleccione un color', trigger: 'change' }
+  ]
 };
 
-const handleSubmit = async () => {
-  if (
-    !localActivity.value.title 
-  ) {
-    ElMessage.error(
-      "El título es requerido"
-    );
-    return;
+// Observar cambios en la actividad para edición
+watch(() => props.activity, (newActivity) => {
+  if (newActivity && Object.keys(newActivity).length > 0) {
+    activityForm.value = {
+      id: newActivity.id,
+      title: newActivity.title || '',
+      description: newActivity.description || '',
+      color: newActivity.color || '#5e72e4',
+      tags: [...(newActivity.tags || [])]
+    };
+  } else {
+    resetForm();
   }
+}, { immediate: true });
 
-  const activityData = {
-    id: localActivity.value?.id || null,
-    title: localActivity.value.title,
-    description: localActivity.value.description || "",
-    color: localActivity.value.color,
-    tags: localSelectedTags.value.map((tag) => tag.id),
+function resetForm() {
+  activityForm.value = {
+    title: '',
+    description: '',
+    color: '#5e72e4',
+    tags: []
   };
+  if (formRef.value) {
+    formRef.value.resetFields();
+  }
+}
 
-  try {
-    let savedActivity;
+function handleClose() {
+  resetForm();
+  emit('close');
+}
 
-    if (props.editMode && props.activity?.id) {
-      savedActivity = await updateActivity(props.activity.id, activityData);
-    } else {
-      savedActivity = await createActivity(activityData);
-    }
+function addSelectedTag() {
+  if (selectedTag.value && !activityForm.value.tags.some(t => t.id === selectedTag.value.id)) {
+    activityForm.value.tags.push(selectedTag.value);
+  }
+  selectedTag.value = null;
+}
 
-    emit("save", savedActivity);
+function removeTag(tag) {
+  activityForm.value.tags = activityForm.value.tags.filter(t => t.id !== tag.id);
+}
 
-    if (!props.editMode) {
-      // eslint-disable-next-line require-atomic-updates
-      localActivity.value = {
-        id: null,
-        title: "",
-        description: "",
-        color: "#5e72e4",
+async function handleSubmit() {
+  if (!formRef.value) return;
+
+  await formRef.value.validate((valid, fields) => {
+    if (valid) {
+      // Asegurarse de que los tags sean un array de IDs
+      const formData = {
+        ...activityForm.value,
+        tags: activityForm.value.tags.map(tag => tag.id)
       };
-      // eslint-disable-next-line require-atomic-updates
-      localSelectedTags.value = [];
-      selectedTag.value = null;
+      emit('save', formData);
+      handleClose();
     }
+  });
+}
 
+function handleDelete() {
+  if (props.editMode && activityForm.value.id) {
+    emit('delete', activityForm.value);
     handleClose();
-  } catch (err) {
-    ElMessage.error("No se pudo guardar la actividad");
-    console.error("Error al guardar actividad:", err);
   }
-};
-
-const handleDelete = async () => {
-  if (!props.activity?.id) return;
-
-  try {
-    await deleteActivity(props.activity.id);
-    emit("delete", props.activity.id);
-    handleClose();
-  } catch (err) {
-    ElMessage.error("No se pudo eliminar la actividad");
-    console.error("Error al eliminar actividad:", err);
-  }
-};
-
-const addTag = () => {
-  if (selectedTagId.value) {
-    const tagToAdd = props.availableTags.find(
-      (t) => t.id === selectedTagId.value
-    );
-    if (
-      tagToAdd &&
-      !localSelectedTags.value.some((t) => t.id === selectedTagId.value)
-    ) {
-      localSelectedTags.value.push(tagToAdd);
-      selectedTagId.value = null;
-    }
-  }
-};
-
-const removeTag = (index) => {
-  localSelectedTags.value.splice(index, 1);
-};
+}
 </script>
 
 <style scoped>
-.tag-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.tag-selector {
-  display: flex;
-  gap: 8px;
-}
-
-.tag-select {
-  flex-grow: 1;
-}
-
-.schedule-section {
-  width: 100%;
-}
-
-.selected-date {
-  font-weight: 500;
-  color: var(--el-color-primary);
-  margin-bottom: 12px;
-}
-
-.time-picker {
-  width: 100%;
-  margin-bottom: 12px;
-}
-
-.duration-input {
-  width: 100%;
-}
-
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 24px;
+.el-tag + .el-tag {
+  margin-left: 8px;
 }
 </style>

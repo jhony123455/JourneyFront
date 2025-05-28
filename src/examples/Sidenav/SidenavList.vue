@@ -42,6 +42,7 @@
         ref="diario"
         class="nav-item"
         @mouseenter="hoverAnimation($event)"
+        @click="diarioClick"
       >
         <sidenav-collapse
           url="#"
@@ -74,6 +75,7 @@
         ref="perfil"
         class="nav-item"
         @mouseenter="hoverAnimation($event)"
+        @click="perfilClick"
       >
         <sidenav-collapse
           url="#"
@@ -205,6 +207,61 @@ function calendarioClick() {
     duration: 0.3,
     clearProps: 'backgroundColor',
   })
+
+  // Navegar a la ruta correcta
+  router.push('/calendario');
+}
+
+function diarioClick() {
+  const el = diario.value;
+  const emojis = ['📖', '✍️', '📝', '💭'];
+  const colors = ['#F3E5F5', '#E8EAF6', '#E3F2FD', '#E0F2F1'];
+  const timeline = gsap.timeline();
+
+  // Crear y animar emojis
+  emojis.forEach((emoji, index) => {
+    const temp = document.createElement('div');
+    temp.textContent = emoji;
+    temp.style.position = 'absolute';
+    temp.style.fontSize = '24px';
+    temp.style.top = `${Math.random() * 80 + 10}%`;
+    temp.style.left = `${Math.random() * 80 + 10}%`;
+    temp.style.zIndex = '10000';
+    el.appendChild(temp);
+
+    gsap.fromTo(
+      temp,
+      { scale: 0, opacity: 1, rotate: -30 },
+      {
+        scale: 1.5,
+        rotate: 30,
+        duration: 0.5,
+        opacity: 0,
+        ease: 'back.out(1.7)',
+        delay: index * 0.1,
+        onComplete: () => el.removeChild(temp),
+      }
+    );
+
+    timeline.to(el, {
+      backgroundColor: colors[index],
+      duration: 0.15,
+      ease: 'power1.inOut',
+    });
+  });
+
+  timeline.to(el, {
+    backgroundColor: '',
+    duration: 0.3,
+    clearProps: 'backgroundColor',
+  });
+
+  // Navegar a la ruta correcta
+  router.push('/diary');
+}
+
+function perfilClick() {
+  router.push('/profile');
 }
 
 async function handleLogout() {

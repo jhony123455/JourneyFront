@@ -27,9 +27,18 @@ import {
   watch,
   nextTick,
   defineExpose,
+  defineEmits,
 } from "vue";
 import { gsap } from "gsap";
 import useApi from "@/composables/useApi";
+import dayjs from "dayjs";
+import timezone from "dayjs/plugin/timezone";
+import utc from "dayjs/plugin/utc";
+
+dayjs.extend(timezone);
+dayjs.extend(utc);
+
+const emit = defineEmits(['date-selected', 'show-context-menu', 'show-event-details']);
 
 const {
   getCalendarEvents,
@@ -44,6 +53,10 @@ const props = defineProps({
     default: () => ({
       droppable: true,
     }),
+  },
+  availableActivities: {
+    type: Array,
+    default: () => [],
   },
 });
 const lastEventDateMap = new Map();
@@ -67,12 +80,10 @@ const pastelColors = {
 // Función mejorada para convertir cualquier color a un tono pastel
 const convertToPastelColor = (color) => {
   if (Object.values(pastelColors).includes(color)) {
-    console.log("Color predefinido:", color);
     return color;
   }
   const colorLower = typeof color === "string" ? color.toLowerCase() : "";
   if (pastelColors[colorLower]) {
-    console.log("Nombre de color a pastel:", pastelColors[colorLower]);
     return pastelColors[colorLower];
   }
 
@@ -94,9 +105,7 @@ const convertToPastelColor = (color) => {
       const pastelR = Math.floor((rgb.r + 255) / 2);
       const pastelG = Math.floor((rgb.g + 255) / 2);
       const pastelB = Math.floor((rgb.b + 255) / 2);
-      const result = `rgb(${pastelR}, ${pastelG}, ${pastelB})`;
-      console.log("Color RGB convertido:", result);
-      return result;
+      return `rgb(${pastelR}, ${pastelG}, ${pastelB})`;
     }
   }
   if (colorLower.startsWith("#")) {
@@ -111,12 +120,9 @@ const convertToPastelColor = (color) => {
       const r = Math.floor((parseInt(hex.substr(0, 2), 16) + 255) / 2);
       const g = Math.floor((parseInt(hex.substr(2, 2), 16) + 255) / 2);
       const b = Math.floor((parseInt(hex.substr(4, 2), 16) + 255) / 2);
-      const result = `rgb(${r}, ${g}, ${b})`;
-      console.log("Color HEX convertido:", result);
-      return result;
+      return `rgb(${r}, ${g}, ${b})`;
     }
   }
-  console.warn("Usando color por defecto");
   return "#e0e0e0";
 };
 
@@ -345,11 +351,9 @@ const applyRadialSegmentation = (cell, colors, width, height) => {
 };
 
 const resetDayCellColor = (dateStr) => {
-  console.log(`Limpiando celda ${dateStr}`);
   const cell = document.querySelector(`[data-date='${dateStr}']`);
 
   if (!cell) {
-    console.warn(`No se encontró celda con fecha ${dateStr}`);
     return;
   }
   const existingOverlays = cell.querySelectorAll(".color-overlay");
@@ -633,12 +637,10 @@ const applySeasonalAnimation = (season = null) => {
 
   const container = calendarCard.value.$el;
   if (!container) {
-    console.error("Contenedor del calendario no encontrado.");
     return;
   }
   const fcContainer = container.querySelector(".fc");
   if (!fcContainer) {
-    console.error("Contenedor FC del calendario no encontrado.");
     return;
   }
   const seasonToApply = season || getCurrentSeason();
@@ -658,8 +660,7 @@ const applySeasonalAnimation = (season = null) => {
     });
   }
 };
-const mergedCalendarOptions = computed(() => {
-  return {
+const mergedCalendarOptions = computed(() => ({
     plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
     initialView: "dayGridMonth",
     locale: esLocale,
@@ -675,115 +676,214 @@ const mergedCalendarOptions = computed(() => {
       day: "Día",
       list: "Lista",
     },
+  selectable: true,
+  editable: true,
+  droppable: true,
+  dateClick(info) {
+    // Emitir un evento para que el componente padre pueda mostrar el formulario de actividad
+    emit('date-selected', {
+      date: info.dateStr,
+      jsEvent: info.jsEvent,
+      view: info.view
+    });
+  },
+  eventDidMount(info) {
+    // Agregar tooltip con descripción
+    if (info.event.extendedProps.description) {
+      const tooltip = document.createElement('div');
+      tooltip.className = 'calendar-tooltip';
+      tooltip.innerHTML = info.event.extendedProps.description;
+      document.body.appendChild(tooltip);
+
+      const eventEl = info.el;
+      eventEl.addEventListener('mouseover', function() {
+        const rect = eventEl.getBoundingClientRect();
+        tooltip.style.display = 'block';
+        tooltip.style.left = rect.left + window.scrollX + 'px';
+        tooltip.style.top = rect.bottom + window.scrollY + 'px';
+      });
+
+      eventEl.addEventListener('mouseout', function() {
+        tooltip.style.display = 'none';
+      });
+
+      info.event.setExtendedProp('tooltip', tooltip);
+    }
+  },
+  eventWillUnmount(info) {
+    // Limpiar tooltip al desmontar evento
+    if (info.event.extendedProps.tooltip) {
+      info.event.extendedProps.tooltip.remove();
+    }
+  },
+  eventClick(info) {
+    // Prevenir la acción por defecto
+    info.jsEvent.preventDefault();
+
+    // Si es clic derecho, mostrar menú contextual
+    if (info.jsEvent.button === 2) {
+      info.el.addEventListener('contextmenu', (e) => e.preventDefault(), { once: true });
+      
+      emit('show-context-menu', {
+        x: info.jsEvent.clientX,
+        y: info.jsEvent.clientY,
+        event: info.event
+      });
+    } else {
+      // Para clic izquierdo, mostrar detalles del evento
+      emit('show-event-details', {
+        id: info.event.id,
+        title: info.event.title,
+        description: info.event.extendedProps?.description || '',
+        color: info.event.backgroundColor || info.event.color,
+        tags: info.event.extendedProps?.tags || [],
+        start: info.event.start,
+        end: info.event.end,
+        activity: info.event.extendedProps?.activity
+      });
+    }
+  },
     eventReceive(info) {
       const dateStr = info.event.startStr;
       const extendedProps = info.event.extendedProps || {};
+    const activity = extendedProps.activity || {};
 
-      const color =
-        extendedProps.color || info.event.backgroundColor || "#e0e0e0";
-
-      const activityId =
-        extendedProps.activityId || (extendedProps.activity || {}).id;
+    // Obtener el ID de la actividad
+    const activityId = extendedProps.activityId || activity.id;
 
       if (!activityId) {
-        console.warn("No se encontró activityId en el evento");
+      info.revert();
         return;
       }
 
+    // Buscar la actividad en las disponibles
+    const foundActivity = props.availableActivities.find(act => act.id === activityId);
+
+    if (!foundActivity) {
+      info.revert();
+      return;
+    }
+
+    // Convertir el color a pastel
+    const pastelColor = convertToPastelColor(foundActivity.color);
+
+    // Convertir la fecha a formato local sin Z al final
+    const localStartDate = dayjs(dateStr).format('YYYY-MM-DD HH:mm:ss');
+    const localEndDate = info.event.endStr ? 
+      dayjs(info.event.endStr).format('YYYY-MM-DD HH:mm:ss') : null;
+
       const eventData = {
-        title: info.event.title,
-        start_date: dateStr,
-        end_date: info.event.endStr || null,
-        color,
+      title: foundActivity.title,
+      start_date: localStartDate,
+      end_date: localEndDate,
+      color: pastelColor,
         activity_id: activityId,
-      };
+      tags: foundActivity.tags || [],
+      all_day: true,
+      description: foundActivity.description || ''
+    };
 
-      // Guardar en la API
-      createCalendarEvent(eventData).catch((error) =>
-        console.error("Error al crear evento en API:", error)
-      );
+    // Actualizar el evento visual inmediatamente
+    info.event.setProp('title', foundActivity.title);
+    info.event.setProp('backgroundColor', pastelColor);
+    info.event.setProp('borderColor', pastelColor);
 
-      // Actualizar interfaz visual
-      colorDayCell(dateStr, color);
-      lastEventDateMap.set(info.event.id, dateStr);
-    },
-
-    ...props.calendarOptions,
-
+    // Guardar el evento en la base de datos
+    createCalendarEvent(eventData)
+      .then(response => {
+        info.event.setProp('id', response.id.toString());
+        
+        // Actualizar el color de la celda
+        mixCellColors(dateStr, pastelColor);
+        lastEventDateMap.set(dateStr, pastelColor);
+      })
+      .catch(() => {
+        info.revert(); // Revertir el evento si hay error
+      });
+  },
     eventDrop(info) {
       eventDropHandler(info);
       const updatedEventData = {
         id: info.event.id,
         start_date: info.event.startStr,
         end_date: info.event.endStr || null,
-      };
+      activity_id: info.event.extendedProps.activityId,
+    };
 
-      updateCalendarEvent(
-        updatedEventData.id,
-        updatedEventData
-      ).catch((error) => console.error("Error al actualizar evento:", error));
-    },
-    eventRemove(info) {
-      const dateStr = lastEventDateMap.get(info.event.id);
-      if (dateStr) {
-        const color =
-          info.event.extendedProps.color ||
-          info.event.backgroundColor ||
-          "#e0e0e0";
-
-        console.log(
-          `Eliminando evento con color ${color} de la fecha ${dateStr}`
-        );
-
-        // Actualizar interfaz visual
-        const colorsForDate = cellColorsMap.get(dateStr);
-        if (colorsForDate) {
-          const pastelColor = convertToPastelColor(color);
-          const newColors = colorsForDate.filter((c) => c !== pastelColor);
-          if (newColors.length === 0) {
-            resetDayCellColor(dateStr);
-          } else {
-            cellColorsMap.set(dateStr, newColors);
-            const cell = document.querySelector(`[data-date='${dateStr}']`);
-            if (cell) {
-              const existingOverlays = cell.querySelectorAll(".color-overlay");
-              existingOverlays.forEach((overlay) => overlay.remove());
-              const segmentationType = getSegmentationType(newColors.length);
-              applySegmentation(cell, newColors, segmentationType);
-            }
-          }
-        }
-
-        // Eliminar del backend
-        deleteCalendarEvent(info.event.id).catch((error) =>
-          console.error("Error al eliminar evento:", error)
-        );
-
-        lastEventDateMap.delete(info.event.id);
-      }
-    },
-  };
-});
+    updateCalendarEvent(updatedEventData.id, updatedEventData)
+      .catch((error) => {
+        info.revert(); // Revertir el evento si hay error
+      });
+  },
+  ...props.calendarOptions,
+}));
 
 onMounted(async () => {
-  if (props.calendarReady && calendarCard.value) {
-    try {
-      const apiEvents = await getCalendarEvents();
+  if (!calendarRef.value) {
+    console.error('Calendar reference not found');
+    return;
+  }
 
-      // Mapear los campos a lo que espera FullCalendar
-      const fcEvents = apiEvents.map((event) => ({
+  try {
+    const api = calendarRef.value.getApi();
+    if (!api) {
+      console.error('Calendar API not initialized');
+      return;
+    }
+
+    const apiEvents = await getCalendarEvents();
+    if (!Array.isArray(apiEvents)) {
+      console.error('Invalid events data received');
+      return;
+    }
+
+    // Mapear los campos a lo que espera FullCalendar
+    const fcEvents = apiEvents.map((event) => {
+      const activity = props.availableActivities.find(
+        (act) => act.id === event.activity_id
+      );
+
+      // Procesar las fechas quitando la Z del final y ajustando al formato correcto
+      const startStr = event.start_date.replace('.000000Z', '');
+      const endStr = event.end_date ? event.end_date.replace('.000000Z', '') : null;
+
+      // Usar el color pastel guardado o convertir el color de la actividad
+      const eventColor = event.color || (activity ? convertToPastelColor(activity.color) : "#e0e0e0");
+
+      return {
         id: event.id.toString(),
-        title: event.title,
-        start: event.start_date,
-        end: event.end_date || null,
-        color: event.color || "#e0e0e0",
+        title: activity ? activity.title : event.title,
+        start: startStr,
+        end: endStr,
+        allDay: event.all_day || false,
+        color: eventColor,
+        backgroundColor: eventColor,
+        borderColor: eventColor,
         extendedProps: {
           activityId: event.activity_id,
-          tags: event.tags || [],
+          activity: activity,
+          description: activity?.description || event.description || '',
+          tags: activity ? activity.tags : (event.tags || []),
         },
-      }));
+      };
+    });
 
-      mergedCalendarOptions.value.events = fcEvents;
+    // Filtrar eventos inválidos
+    const validEvents = fcEvents.filter(event => event.title && event.start);
+    
+    // Limpiar eventos existentes
+    api.removeAllEvents();
+    
+    // Agregar nuevos eventos
+    validEvents.forEach(eventData => {
+      api.addEvent(eventData);
+      
+      // Actualizar los colores de las celdas
+      const dateStr = dayjs(eventData.start).format('YYYY-MM-DD');
+      colorDayCell(dateStr, eventData.color);
+      lastEventDateMap.set(eventData.id, dateStr);
+    });
+
     } catch (error) {
       console.error("No se pudieron cargar los eventos:", error);
     }
@@ -793,7 +893,6 @@ onMounted(async () => {
         applySeasonalAnimation();
       }, 500);
     });
-  }
 });
 
 watch(
@@ -903,5 +1002,20 @@ defineExpose({
   background-color: rgba(255, 255, 255, 0.9);
   padding: 8px;
   border-radius: 0.5rem 0.5rem 0 0;
+}
+
+:deep(.calendar-tooltip) {
+  position: absolute;
+  z-index: 9999;
+  background: white;
+  border: 1px solid #ddd;
+  padding: 8px;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  display: none;
+  max-width: 200px;
+  word-wrap: break-word;
+  font-size: 12px;
+  pointer-events: none;
 }
 </style>
