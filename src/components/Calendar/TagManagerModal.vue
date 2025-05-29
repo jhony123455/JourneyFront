@@ -62,6 +62,7 @@ import { ref, computed, watch, defineProps, defineEmits } from "vue";
 import { Delete } from "@element-plus/icons-vue";
 import useApi from "@/composables/useApi";
 import useTagStore from "@/composables/useTagStore";
+import { useStore } from 'vuex';
 
 const props = defineProps({
   showTagModal: Boolean,
@@ -69,6 +70,9 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["close"]);
+
+const store = useStore();
+const userId = computed(() => store.state.auth.user?.id);
 
 const {
   fetchTags,
@@ -101,6 +105,7 @@ const addNewTag = async () => {
     const newTag = await createTag({
       name: newTagName.value.trim(),
       color: newTagColor.value,
+      user_id: userId.value
     });
     tagStore.availableTags.push(newTag);
     
@@ -118,6 +123,7 @@ const updateTag = async (tag) => {
     await apiUpdateTag(tag.id, {
       name: tag.name,
       color: tag.color,
+      user_id: userId.value
     });
   } catch (err) {
     console.error("Error actualizando etiqueta:", err);
@@ -127,7 +133,7 @@ const updateTag = async (tag) => {
 
 const removeTag = async (tagId) => {
   try {
-    await apiDeleteTag(tagId);
+    await apiDeleteTag(tagId, { user_id: userId.value });
     
     // Actualizar el store después de borrar
     const index = tagStore.availableTags.findIndex(t => t.id === tagId);

@@ -1,3 +1,3 @@
 module.exports = {
-  transpileDependencies: ["birpc"],
+  transpileDependencies: ["birpc", "@vue/devtools-kit", "@vue/devtools-api", "vee-validate"],
 };

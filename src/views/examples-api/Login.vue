@@ -16,6 +16,7 @@ const router = useRouter();
 const store = useStore();
 const isLoading = ref(false);
 const isRememberMeEnabled = ref(false);
+const showPassword = ref(false);
 
 const user = ref({
   name: "",
@@ -285,6 +286,10 @@ onMounted(() => {
     }
   });
 });
+
+const togglePasswordVisibility = () => {
+  showPassword.value = !showPassword.value;
+};
 </script>
 <template>
   <navbar btn-background="bg-gradient-dark" />
@@ -323,16 +328,26 @@ onMounted(() => {
                     placeholder="Ingrese su usuario"
                   />
                 </div>
-                <div class="mb-3 form-element">
+                <div class="mb-3 form-element password-field">
                   <material-input-field
                     id="password"
                     v-model="user.password"
-                    type="password"
+                    :type="showPassword ? 'text' : 'password'"
                     label="Contraseña"
                     name="password"
                     variant="static"
                     placeholder="Ingrese su Contraseña"
                   />
+                  <button 
+                    type="button"
+                    class="password-toggle"
+                    @click="togglePasswordVisibility"
+                    :title="showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+                  >
+                    <i class="material-icons-round">
+                      {{ showPassword ? 'visibility_off' : 'visibility' }}
+                    </i>
+                  </button>
                 </div>
                 <div class="form-element">
                   <material-switch
@@ -429,5 +444,45 @@ h3 {
 .logo-img {
   max-width: 300px;
   height: auto;
+}
+
+.password-field {
+  position: relative;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6c757d;
+  transition: all 0.3s ease;
+  border-radius: 50%;
+}
+
+.password-toggle:hover {
+  background-color: rgba(108, 117, 125, 0.1);
+  color: #2d2d2d;
+}
+
+.password-toggle:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(108, 117, 125, 0.25);
+}
+
+.password-toggle i {
+  font-size: 20px;
+  transition: transform 0.3s ease;
+}
+
+.password-toggle:hover i {
+  transform: scale(1.1);
 }
 </style>

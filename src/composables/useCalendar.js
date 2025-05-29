@@ -9,6 +9,7 @@ import { Draggable } from "@fullcalendar/interaction";
 import gsap from "gsap";
 import { ElMessageBox } from "element-plus";
 import { useRouter } from "vue-router";
+import { useStore } from 'vuex';
 
 import useAnimation from "./useAnimation";
 import useTags from "./useTags";
@@ -16,6 +17,9 @@ import useActivities from "./useActivities";
 import useApi from "./useApi";
 
 export default function useCalendar() {
+  const store = useStore();
+  const userId = computed(() => store.state.auth.user?.id);
+
   dayjs.extend(utc);
   dayjs.extend(timezone);
 
@@ -772,7 +776,6 @@ export default function useCalendar() {
   // Función para eliminar un evento del calendario
   async function deleteCalendarEvent(calendarEventId) {
     try {
-      // Primero eliminar del backend
       await api.deleteCalendarEvent(calendarEventId);
       
       // Actualizar el estado local inmediatamente
@@ -796,25 +799,7 @@ export default function useCalendar() {
           // Limpiar los colores de la celda si es necesario
           if (lastEventDateMap.has(calendarEventId)) {
             const dateStr = lastEventDateMap.get(calendarEventId);
-            const colorsForDate = cellColorsMap.get(dateStr);
-            if (colorsForDate) {
-              const color = eventToRemove.backgroundColor || eventToRemove.color || "#e0e0e0";
-              const pastelColor = convertToPastelColor(color);
-              const newColors = colorsForDate.filter(c => c !== pastelColor);
-              
-              if (newColors.length === 0) {
-                resetDayCellColor(dateStr);
-              } else {
-                cellColorsMap.set(dateStr, newColors);
-                const cell = document.querySelector(`[data-date='${dateStr}']`);
-                if (cell) {
-                  const existingOverlays = cell.querySelectorAll(".color-overlay");
-                  existingOverlays.forEach(overlay => overlay.remove());
-                  const segmentationType = getSegmentationType(newColors.length);
-                  applySegmentation(cell, newColors, segmentationType);
-                }
-              }
-            }
+            resetDayCellColor(dateStr);
             lastEventDateMap.delete(calendarEventId);
           }
         }
@@ -881,6 +866,51 @@ export default function useCalendar() {
   onUnmounted(() => {
     document.removeEventListener("click", handleDocumentClick);
   });
+
+  // Función para crear eventos del calendario
+  async function createCalendarEvent(eventData) {
+    try {
+      // El user_id ya debe venir en eventData desde el componente
+      const response = await api.createCalendarEvent(eventData);
+      
+      // Actualizar la lista local de actividades
+      if (response && response.id) {
+        scheduledActivities.value.push({
+          ...eventData,
+          id: response.id
+        });
+      }
+      
+      return response;
+    } catch (error) {
+      console.error('Error creating calendar event:', error);
+      showNotification('Error al crear el evento', 'error');
+      throw error;
+    }
+  }
+
+  // Función para actualizar eventos del calendario
+  async function updateCalendarEvent(eventId, eventData) {
+    try {
+      // El user_id ya debe venir en eventData desde el componente
+      const response = await api.updateCalendarEvent(eventId, eventData);
+      
+      // Actualizar la lista local de actividades
+      const index = scheduledActivities.value.findIndex(event => event.id === eventId);
+      if (index !== -1) {
+        scheduledActivities.value[index] = {
+          ...scheduledActivities.value[index],
+          ...eventData
+        };
+      }
+      
+      return response;
+    } catch (error) {
+      console.error('Error updating calendar event:', error);
+      showNotification('Error al actualizar el evento', 'error');
+      throw error;
+    }
+  }
 
   return {
     // Estado del calendario
@@ -953,5 +983,8 @@ export default function useCalendar() {
 
     // Función para cargar los eventos del calendario
     loadCalendarEvents,
+
+    createCalendarEvent,
+    updateCalendarEvent,
   };
 }

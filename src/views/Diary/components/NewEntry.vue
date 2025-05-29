@@ -31,6 +31,25 @@
             @change="updatePreviewColor"
           />
         </div>
+
+        <!-- Plantillas predeterminadas -->
+        <div class="template-entries" v-if="templateEntries.length > 0">
+          <h4 class="handwritten">Colores predeterminados</h4>
+          <div class="templates-grid">
+            <div
+              v-for="template in templateEntries"
+              :key="template.id"
+              class="template-card"
+              :style="{
+                backgroundColor: template.color,
+                color: getContrastColor(template.color)
+              }"
+              @click="useTemplate(template)"
+            >
+              <span class="template-name">{{ template.title.replace('Plantilla ', '') }}</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -108,11 +127,25 @@ const entryContent = ref("");
 const titleError = ref(false);
 const colorType = ref(null); // 'original' o 'pastel'
 
-// Eliminamos los colores predefinidos ya que vienen del backend
-const defaultColors = [];
+const templateEntries = ref([]);
 
-// Si estamos en modo edición, inicializamos con los valores existentes
-onMounted(() => {
+// Cargar las entradas plantilla
+async function loadTemplateEntries() {
+  try {
+    // Usamos el método index y filtramos las plantillas por el título
+    const response = await axios.get('/diary-entries');
+    // Filtramos las entradas que son plantillas (comienzan con "Plantilla")
+    templateEntries.value = response.data.filter(entry => 
+      entry.title.startsWith('Plantilla')
+    );
+  } catch (error) {
+    console.error('Error loading template entries:', error);
+  }
+}
+
+onMounted(async () => {
+  await loadTemplateEntries();
+  
   if (props.entryToEdit) {
     entryTitle.value = props.entryToEdit.title;
     entryContent.value = props.entryToEdit.content;
@@ -290,6 +323,12 @@ async function saveEntry() {
       text: "No se pudo guardar la entrada. Por favor, intenta de nuevo.",
     });
   }
+}
+
+function useTemplate(template) {
+  selectedColor.value = template.color;
+  previewColor.value = template.color;
+  animateToEditor();
 }
 </script>
 
@@ -511,5 +550,125 @@ async function saveEntry() {
 
 .preview-split > div:active {
   transform: scale(0.98);
+}
+
+.predefined-colors {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+.predefined-colors h4 {
+  margin-bottom: 1rem;
+  font-size: 1.5rem;
+}
+
+.color-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.predefined-color {
+  padding: 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: 'Caveat', cursive;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.predefined-color:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.template-colors {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+.template-colors h4 {
+  margin-bottom: 1rem;
+  font-size: 1.5rem;
+}
+
+.colors-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.color-card {
+  padding: 1.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: 'Caveat', cursive;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.color-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.color-name {
+  word-break: break-word;
+  line-height: 1.2;
+}
+
+.template-entries {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+.template-entries h4 {
+  margin-bottom: 1rem;
+  font-size: 1.5rem;
+}
+
+.templates-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.template-card {
+  padding: 1.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: 'Caveat', cursive;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.template-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.template-name {
+  word-break: break-word;
+  line-height: 1.2;
 }
 </style>

@@ -16,6 +16,10 @@ const headerRef = ref(null);
 const illustrationRef = ref(null);
 const submitButtonRef = ref(null);
 
+// Estado para mostrar/ocultar contraseñas
+const showPassword = ref(false);
+const showConfirmPassword = ref(false);
+
 const router = useRouter();
 const store = useStore();
 
@@ -167,6 +171,15 @@ const handleButtonLeave = () => {
   });
 };
 
+// Funciones para alternar visibilidad de contraseñas
+const togglePasswordVisibility = () => {
+  showPassword.value = !showPassword.value;
+};
+
+const toggleConfirmPasswordVisibility = () => {
+  showConfirmPassword.value = !showConfirmPassword.value;
+};
+
 const handleSignup = async (values) => {
   const submitButton = submitButtonRef.value.$el;
 
@@ -200,11 +213,11 @@ const handleSignup = async (values) => {
     await Swal.fire({
       icon: 'success',
       title: '¡Registro exitoso!',
-      text: 'Tu cuenta ha sido creada correctamente',
+      text: 'Tu cuenta ha sido creada correctamente. Por favor, inicia sesión.',
       confirmButtonColor: '#3085d6',
     });
 
-    router.push({ name: 'Calendario' }); 
+    router.push({ name: 'Login' }); 
 
   } catch (error) {
     console.error("Error de registro:", error);
@@ -212,7 +225,6 @@ const handleSignup = async (values) => {
     let errorTitle = 'Error de registro';
     let errorMessage = error?.response?.data?.message || error.message || 'Ocurrió un error al registrar tu cuenta';
 
-    // 🚨 Aquí verificamos si el error es porque ya existe el usuario
     if (errorMessage.includes('ya está registrado')) {
       errorTitle = 'Nombre de usuario ya registrado';
       errorMessage = 'Por favor elige otro nombre de usuario.';
@@ -296,25 +308,45 @@ const handleSignup = async (values) => {
                         <material-input-field
                           id="password"
                           v-model="user.password"
-                          type="password"
+                          :type="showPassword ? 'text' : 'password'"
                           label="Contraseña"
                           name="password"
                           variant="static"
                           @focus="handleInputFocus"
                           @blur="handleInputBlur"
-                        />
+                        >
+                          <template #append>
+                            <button
+                              type="button"
+                              class="password-toggle"
+                              @click="togglePasswordVisibility"
+                            >
+                              <i :class="showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                            </button>
+                          </template>
+                        </material-input-field>
                       </div>
                       <div class="mb-3 input-wrapper">
                         <material-input-field
                           id="confirmPassword"
                           v-model="user.confirmPassword"
-                          type="password"
+                          :type="showConfirmPassword ? 'text' : 'password'"
                           label="Confirma Tu Contraseña"
                           name="confirmPassword"
                           variant="static"
                           @focus="handleInputFocus"
                           @blur="handleInputBlur"
-                        />
+                        >
+                          <template #append>
+                            <button
+                              type="button"
+                              class="password-toggle"
+                              @click="toggleConfirmPasswordVisibility"
+                            >
+                              <i :class="showConfirmPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                            </button>
+                          </template>
+                        </material-input-field>
                       </div>
                       <div class="text-center">
                         <material-button
@@ -415,5 +447,30 @@ const handleSignup = async (values) => {
 .text-gradient:hover {
   text-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
   transform: translateY(-1px);
+}
+
+.password-toggle {
+  background: none;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  padding: 0.5rem;
+  transition: color 0.3s ease;
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.password-toggle:hover {
+  color: #333;
+}
+
+.password-toggle:focus {
+  outline: none;
+}
+
+.password-toggle i {
+  font-size: 1rem;
 }
 </style>

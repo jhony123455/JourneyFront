@@ -34,6 +34,7 @@ import useApi from "@/composables/useApi";
 import dayjs from "dayjs";
 import timezone from "dayjs/plugin/timezone";
 import utc from "dayjs/plugin/utc";
+import { useStore } from 'vuex';
 
 dayjs.extend(timezone);
 dayjs.extend(utc);
@@ -64,6 +65,89 @@ const cellColorsMap = new Map();
 
 const calendarRef = ref(null);
 const calendarCard = ref(null);
+
+const store = useStore();
+const userId = computed(() => store.state.auth.user?.id);
+
+// Agregar un watcher para userId
+watch(userId, (newUserId) => {
+  if (newUserId && calendarRef.value) {
+    // Recargar eventos cuando el userId cambie o esté disponible
+    loadEvents();
+  }
+});
+
+// Extraer la lógica de carga de eventos a una función separada
+const loadEvents = async () => {
+  if (!calendarRef.value || !userId.value) {
+    console.warn('Calendar not ready or user not authenticated');
+    return;
+  }
+
+  try {
+    const api = calendarRef.value.getApi();
+    if (!api) {
+      console.error('Calendar API not initialized');
+      return;
+    }
+
+    const apiEvents = await getCalendarEvents();
+    if (!Array.isArray(apiEvents)) {
+      console.error('Invalid events data received');
+      return;
+    }
+
+    // Mapear los campos a lo que espera FullCalendar
+    const fcEvents = apiEvents.map((event) => {
+      const activity = props.availableActivities.find(
+        (act) => act.id === event.activity_id
+      );
+
+      // Procesar las fechas quitando la Z del final y ajustando al formato correcto
+      const startStr = event.start_date.replace('.000000Z', '');
+      const endStr = event.end_date ? event.end_date.replace('.000000Z', '') : null;
+
+      // Usar el color pastel guardado o convertir el color de la actividad
+      const eventColor = event.color || (activity ? convertToPastelColor(activity.color) : "#e0e0e0");
+
+      return {
+        id: event.id.toString(),
+        title: activity ? activity.title : event.title,
+        start: startStr,
+        end: endStr,
+        allDay: event.all_day || false,
+        color: eventColor,
+        backgroundColor: eventColor,
+        borderColor: eventColor,
+        extendedProps: {
+          activityId: event.activity_id,
+          activity: activity,
+          description: activity?.description || event.description || '',
+          tags: activity ? activity.tags : (event.tags || []),
+        },
+      };
+    });
+
+    // Filtrar eventos inválidos
+    const validEvents = fcEvents.filter(event => event.title && event.start);
+    
+    // Limpiar eventos existentes
+    api.removeAllEvents();
+    
+    // Agregar nuevos eventos
+    validEvents.forEach(eventData => {
+      api.addEvent(eventData);
+      
+      // Actualizar los colores de las celdas
+      const dateStr = dayjs(eventData.start).format('YYYY-MM-DD');
+      colorDayCell(dateStr, eventData.color);
+      lastEventDateMap.set(eventData.id, dateStr);
+    });
+
+  } catch (error) {
+    console.error("No se pudieron cargar los eventos:", error);
+  }
+};
 
 // Colores pastel para eventos
 const pastelColors = {
@@ -778,6 +862,7 @@ const mergedCalendarOptions = computed(() => ({
       const activityId = extendedProps.activityId || activity.id;
 
       if (!activityId) {
+        console.error('No se encontró el ID de la actividad');
         info.revert();
         return false;
       }
@@ -786,6 +871,14 @@ const mergedCalendarOptions = computed(() => ({
       const foundActivity = props.availableActivities.find(act => act.id === activityId);
 
       if (!foundActivity) {
+        console.error('Actividad no encontrada en las disponibles');
+        info.revert();
+        return false;
+      }
+
+      // Asegurarse de que el user_id esté disponible
+      if (!userId.value) {
+        console.error('No se encontró el user_id');
         info.revert();
         return false;
       }
@@ -806,44 +899,83 @@ const mergedCalendarOptions = computed(() => ({
         activity_id: activityId,
         tags: foundActivity.tags || [],
         all_day: true,
-        description: foundActivity.description || ''
+        description: foundActivity.description || '',
+        user_id: userId.value
       };
 
-      // Actualizar el evento visual inmediatamente
-      info.event.setProp('title', foundActivity.title);
-      info.event.setProp('backgroundColor', pastelColor);
-      info.event.setProp('borderColor', pastelColor);
+      // Guardar una referencia al evento original
+      const originalEvent = info.event;
 
       // Guardar el evento en la base de datos
       createCalendarEvent(eventData)
         .then(response => {
-          // Actualizar el ID del evento con el retornado por el servidor
-          info.event.setProp('id', response.id.toString());
+          if (!response || !response.id) {
+            console.error('Respuesta inválida del servidor');
+            info.revert();
+            return;
+          }
+
+          // Actualizar el evento en el calendario con los datos del servidor
+          const calendarApi = calendarRef.value.getApi();
           
-          // Actualizar el color de la celda
+          // Remover el evento temporal
+          originalEvent.remove();
+
+          // Crear el nuevo evento con los datos correctos
+          const newEventData = {
+            id: response.id.toString(),
+            title: foundActivity.title,
+            start: localStartDate,
+            end: localEndDate,
+            allDay: true,
+            backgroundColor: pastelColor,
+            borderColor: pastelColor,
+            extendedProps: {
+              activityId: activityId,
+              activity: foundActivity,
+              description: foundActivity.description || '',
+              tags: foundActivity.tags || []
+            }
+          };
+
+          // Agregar el nuevo evento al calendario
+          calendarApi.addEvent(newEventData);
+          
+          // Actualizar el color de la celda y el mapa de eventos
           mixCellColors(dateStr, pastelColor);
           lastEventDateMap.set(response.id.toString(), dateStr);
         })
-        .catch(() => {
-          info.revert(); // Revertir el evento si hay error
+        .catch((error) => {
+          console.error('Error al crear el evento:', error);
+          info.revert();
         });
 
       return false; // Evitar que el evento se propague
     },
     eventDrop(info) {
       eventDropHandler(info);
+
+      // Verificar que el user_id esté disponible
+      if (!userId.value) {
+        console.error('No se encontró el user_id');
+        info.revert();
+        return;
+      }
+
       const updatedEventData = {
         id: info.event.id,
         start_date: info.event.startStr,
         end_date: info.event.endStr || null,
-      activity_id: info.event.extendedProps.activityId,
-    };
+        activity_id: info.event.extendedProps.activityId,
+        user_id: userId.value
+      };
 
-    updateCalendarEvent(updatedEventData.id, updatedEventData)
-      .catch((error) => {
-        info.revert(); // Revertir el evento si hay error
-      });
-  },
+      updateCalendarEvent(updatedEventData.id, updatedEventData)
+        .catch((error) => {
+          console.error('Error al actualizar el evento:', error);
+          info.revert(); // Revertir el evento si hay error
+        });
+    },
   ...props.calendarOptions,
 }));
 
@@ -853,75 +985,16 @@ onMounted(async () => {
     return;
   }
 
-  try {
-    const api = calendarRef.value.getApi();
-    if (!api) {
-      console.error('Calendar API not initialized');
-      return;
-    }
+  // Intentar cargar eventos solo si el usuario está autenticado
+  if (userId.value) {
+    await loadEvents();
+  }
 
-    const apiEvents = await getCalendarEvents();
-    if (!Array.isArray(apiEvents)) {
-      console.error('Invalid events data received');
-      return;
-    }
-
-    // Mapear los campos a lo que espera FullCalendar
-    const fcEvents = apiEvents.map((event) => {
-      const activity = props.availableActivities.find(
-        (act) => act.id === event.activity_id
-      );
-
-      // Procesar las fechas quitando la Z del final y ajustando al formato correcto
-      const startStr = event.start_date.replace('.000000Z', '');
-      const endStr = event.end_date ? event.end_date.replace('.000000Z', '') : null;
-
-      // Usar el color pastel guardado o convertir el color de la actividad
-      const eventColor = event.color || (activity ? convertToPastelColor(activity.color) : "#e0e0e0");
-
-      return {
-        id: event.id.toString(),
-        title: activity ? activity.title : event.title,
-        start: startStr,
-        end: endStr,
-        allDay: event.all_day || false,
-        color: eventColor,
-        backgroundColor: eventColor,
-        borderColor: eventColor,
-        extendedProps: {
-          activityId: event.activity_id,
-          activity: activity,
-          description: activity?.description || event.description || '',
-          tags: activity ? activity.tags : (event.tags || []),
-        },
-      };
-    });
-
-    // Filtrar eventos inválidos
-    const validEvents = fcEvents.filter(event => event.title && event.start);
-    
-    // Limpiar eventos existentes
-    api.removeAllEvents();
-    
-    // Agregar nuevos eventos
-    validEvents.forEach(eventData => {
-      api.addEvent(eventData);
-      
-      // Actualizar los colores de las celdas
-      const dateStr = dayjs(eventData.start).format('YYYY-MM-DD');
-      colorDayCell(dateStr, eventData.color);
-      lastEventDateMap.set(eventData.id, dateStr);
-    });
-
-    } catch (error) {
-      console.error("No se pudieron cargar los eventos:", error);
-    }
-
-    nextTick(() => {
-      setTimeout(() => {
-        applySeasonalAnimation();
-      }, 500);
-    });
+  nextTick(() => {
+    setTimeout(() => {
+      applySeasonalAnimation();
+    }, 500);
+  });
 });
 
 watch(
