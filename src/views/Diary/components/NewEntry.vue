@@ -1,54 +1,130 @@
 <template>
   <div class="new-entry-overlay" ref="overlay" v-show="isVisible">
-    <!-- Selector de color -->
-    <div class="color-selector" ref="colorSelector" v-show="!selectedColor">
+    <!-- Selector de color y estilo -->
+    <div class="style-selector" ref="colorSelector" v-show="!selectedColor">
       <h3 class="handwritten">Personaliza tu página</h3>
 
-      <div class="color-picker-container">
-        <div class="color-preview">
-          <div class="preview-split">
-            <div
-              class="original-color"
-              :style="{ backgroundColor: previewColor }"
-              @click="selectOriginalColor"
-            >
-              <span class="preview-label">Original</span>
+      <div class="customization-options">
+        <!-- Pestañas de navegación -->
+        <div class="style-tabs">
+          <button 
+            class="tab-button" 
+            :class="{ active: activeTab === 'color' }"
+            @click="activeTab = 'color'"
+          >
+            <i class="material-icons-round">palette</i>
+            Color
+          </button>
+          <button 
+            class="tab-button" 
+            :class="{ active: activeTab === 'font' }"
+            @click="activeTab = 'font'"
+          >
+            <i class="material-icons-round">text_format</i>
+            Letra
+          </button>
+          <button 
+            class="tab-button" 
+            :class="{ active: activeTab === 'lines' }"
+            @click="activeTab = 'lines'"
+          >
+            <i class="material-icons-round">border_all</i>
+            Líneas
+          </button>
+        </div>
+
+        <div class="options-content">
+          <!-- Panel de Color -->
+          <div v-show="activeTab === 'color'" class="tab-panel">
+            <div class="color-picker-container">
+              <div class="color-preview">
+                <div class="preview-split">
+                  <div
+                    class="original-color"
+                    :style="{ backgroundColor: previewColor }"
+                    @click="selectOriginalColor"
+                  >
+                    <span class="preview-label">Original</span>
+                  </div>
+                  <div
+                    class="pastel-color"
+                    :style="{ backgroundColor: pastelPreviewColor }"
+                    @click="selectPastelColor"
+                  >
+                    <span class="preview-label">Pastel</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="picker-controls">
+                <el-color-picker
+                  v-model="previewColor"
+                  show-alpha
+                  @change="updatePreviewColor"
+                />
+              </div>
+
+              <!-- Plantillas predeterminadas -->
+              <div class="template-entries" v-if="templateEntries.length > 0">
+                <h4 class="handwritten">Colores predeterminados</h4>
+                <div class="templates-grid">
+                  <div
+                    v-for="template in templateEntries"
+                    :key="template.id"
+                    class="template-card"
+                    :style="{
+                      backgroundColor: template.color,
+                      color: getContrastColor(template.color)
+                    }"
+                    @click="useTemplate(template)"
+                  >
+                    <span class="template-name">{{ template.title.replace('Plantilla ', '') }}</span>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div
-              class="pastel-color"
-              :style="{ backgroundColor: pastelPreviewColor }"
-              @click="selectPastelColor"
-            >
-              <span class="preview-label">Pastel</span>
+          </div>
+
+          <!-- Panel de Fuentes -->
+          <div v-show="activeTab === 'font'" class="tab-panel">
+            <div class="font-options">
+              <div 
+                v-for="font in availableFonts" 
+                :key="font.name"
+                class="font-option"
+                :class="{ active: selectedFont === font.name }"
+                :style="{ fontFamily: font.name }"
+                @click="selectFont(font.name)"
+              >
+                <span class="font-preview">{{ font.preview }}</span>
+                <span class="font-name">{{ font.label }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Panel de Líneas -->
+          <div v-show="activeTab === 'lines'" class="tab-panel">
+            <div class="lines-options">
+              <div 
+                v-for="style in lineStyles" 
+                :key="style.name"
+                class="line-option"
+                :class="{ active: selectedLineStyle === style.name }"
+                @click="selectLineStyle(style.name)"
+              >
+                <div class="line-preview" :class="style.name">
+                  <span class="line-name">{{ style.label }}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        <div class="picker-controls">
-          <el-color-picker
-            v-model="previewColor"
-            show-alpha
-            @change="updatePreviewColor"
-          />
-        </div>
-
-        <!-- Plantillas predeterminadas -->
-        <div class="template-entries" v-if="templateEntries.length > 0">
-          <h4 class="handwritten">Colores predeterminados</h4>
-          <div class="templates-grid">
-            <div
-              v-for="template in templateEntries"
-              :key="template.id"
-              class="template-card"
-              :style="{
-                backgroundColor: template.color,
-                color: getContrastColor(template.color)
-              }"
-              @click="useTemplate(template)"
-            >
-              <span class="template-name">{{ template.title.replace('Plantilla ', '') }}</span>
-            </div>
-          </div>
+        <div class="style-actions">
+          <button class="action-button continue" @click="continueToEditor">
+            <i class="material-icons-round">arrow_forward</i>
+            Continuar
+          </button>
         </div>
       </div>
     </div>
@@ -61,19 +137,19 @@
             <input
               ref="titleInput"
               v-model="entryTitle"
-              class="entry-title handwritten"
+              class="entry-title"
+              :class="{ [selectedFont]: true }"
               placeholder="Título de tu entrada..."
               :style="{ color: selectedTextColor }"
               @input="titleError = false"
             />
-            <span class="error-message" v-if="titleError"
-              >El título es obligatorio</span
-            >
+            <span class="error-message" v-if="titleError">El título es obligatorio</span>
           </div>
           <textarea
             ref="contentTextarea"
             v-model="entryContent"
-            class="entry-content handwritten"
+            class="entry-content"
+            :class="{ [selectedFont]: true, [selectedLineStyle]: true }"
             placeholder="Comienza a escribir..."
             :style="{ color: selectedTextColor }"
           ></textarea>
@@ -81,6 +157,10 @@
       </div>
       <!-- Botones de acción -->
       <div class="action-buttons" ref="actionButtons">
+        <button class="action-button edit-style" @click="backToStyleSelector">
+          <i class="material-icons-round">style</i>
+          Editar Estilo
+        </button>
         <button class="action-button save" @click="saveEntry">
           <i class="material-icons-round">save</i>
           Guardar
@@ -128,6 +208,59 @@ const titleError = ref(false);
 const colorType = ref(null); // 'original' o 'pastel'
 
 const templateEntries = ref([]);
+
+// Nuevas importaciones y refs
+const activeTab = ref('color');
+const selectedFont = ref('handwritten');
+const selectedLineStyle = ref('lined');
+
+// Fuentes disponibles
+const availableFonts = [
+  { name: 'handwritten', label: 'Manuscrita', preview: 'Querido diario...' },
+  { name: 'elegant', label: 'Elegante', preview: 'Querido diario...' },
+  { name: 'modern', label: 'Moderna', preview: 'Querido diario...' },
+  { name: 'typewriter', label: 'Máquina de escribir', preview: 'Querido diario...' },
+  { name: 'casual', label: 'Casual', preview: 'Querido diario...' }
+];
+
+// Estilos de líneas disponibles
+const lineStyles = [
+  { name: 'lined', label: 'Rayado' },
+  { name: 'dotted', label: 'Punteado' },
+  { name: 'squared', label: 'Cuadriculado' }
+];
+
+// Funciones para selección de estilos
+function selectFont(fontName) {
+  selectedFont.value = fontName;
+}
+
+function selectLineStyle(styleName) {
+  selectedLineStyle.value = styleName;
+}
+
+function continueToEditor() {
+  if (!selectedColor.value) {
+    selectOriginalColor();
+  }
+  animateToEditor();
+}
+
+function backToStyleSelector() {
+  gsap.to(entryEditor.value, {
+    opacity: 0,
+    scale: 0.9,
+    duration: 0.3,
+    onComplete: () => {
+      selectedColor.value = null;
+      gsap.to(colorSelector.value, {
+        opacity: 1,
+        scale: 1,
+        duration: 0.3
+      });
+    }
+  });
+}
 
 // Cargar las entradas plantilla
 async function loadTemplateEntries() {
@@ -286,7 +419,6 @@ async function saveEntry() {
   }
 
   try {
-    // Asegurarnos de que siempre tengamos un color válido
     const finalColor = selectedColor.value || "#FFFFFF";
     
     const payload = {
@@ -294,10 +426,10 @@ async function saveEntry() {
       content: entryContent.value.trim(),
       color: finalColor,
       text_color: getContrastColor(finalColor),
+      font_style: selectedFont.value,
+      line_style: selectedLineStyle.value,
       entry_date: props.entryToEdit?.entry_date || new Date().toISOString().split('T')[0]
     };
-
-    console.log('Guardando entrada:', payload);
 
     let response;
     if (props.entryToEdit) {
@@ -348,18 +480,67 @@ function useTemplate(template) {
   transition: opacity 0.3s ease;
 }
 
-.color-selector {
+.style-selector {
   background: white;
   padding: 2rem;
   border-radius: 15px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-  text-align: center;
-  max-width: 500px;
   width: 90%;
+  max-width: 800px;
+  max-height: 80vh;
+  overflow-y: auto;
 }
 
 .handwritten {
   font-family: "Caveat", cursive;
+}
+
+.customization-options {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.style-tabs {
+  display: flex;
+  gap: 1rem;
+  border-bottom: 2px solid #eee;
+  padding-bottom: 1rem;
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 10;
+}
+
+.tab-button {
+  padding: 0.8rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  background: #f5f5f5;
+  color: #666;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.3s ease;
+}
+
+.tab-button.active {
+  background: #8B4513;
+  color: white;
+}
+
+.tab-button:hover {
+  transform: translateY(-2px);
+}
+
+.options-content {
+  flex: 1;
+  min-height: 400px;
+}
+
+.tab-panel {
+  padding: 1rem;
 }
 
 .color-picker-container {
@@ -435,6 +616,142 @@ function useTemplate(template) {
   transform: scale(1.1);
 }
 
+.template-entries {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+.template-entries h4 {
+  margin-bottom: 1rem;
+  font-size: 1.5rem;
+}
+
+.templates-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.template-card {
+  padding: 1.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: 'Caveat', cursive;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.template-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.template-name {
+  word-break: break-word;
+  line-height: 1.2;
+}
+
+/* Estilos para las opciones de fuente */
+.font-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+.font-option {
+  padding: 1.5rem;
+  border: 2px solid #eee;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.font-option.active {
+  border-color: #8B4513;
+  background: rgba(139, 69, 19, 0.1);
+}
+
+.font-option:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.font-preview {
+  display: block;
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.font-name {
+  display: block;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+/* Estilos para el scroll */
+.style-selector::-webkit-scrollbar {
+  width: 8px;
+}
+
+.style-selector::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.style-selector::-webkit-scrollbar-thumb {
+  background: #8B4513;
+  border-radius: 4px;
+}
+
+.style-selector::-webkit-scrollbar-thumb:hover {
+  background: #654321;
+}
+
+/* Estilos para las fuentes */
+.elegant {
+  font-family: 'Playfair Display', serif;
+}
+
+.modern {
+  font-family: 'Roboto', sans-serif;
+}
+
+.typewriter {
+  font-family: 'Courier Prime', monospace;
+}
+
+.casual {
+  font-family: 'Comic Neue', cursive;
+}
+
+/* Botón de continuar */
+.style-actions {
+  position: sticky;
+  bottom: 0;
+  background: white;
+  padding: 1rem 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.action-button.continue {
+  background: #8B4513;
+  color: white;
+}
+
+.action-button.edit-style {
+  background: #666;
+  color: white;
+}
+
+/* Mantener los estilos originales de la hoja */
 .entry-editor {
   width: 90%;
   max-width: 800px;
@@ -539,136 +856,75 @@ function useTemplate(template) {
   font-size: 0.8rem;
 }
 
-.preview-split > div {
+/* Estilos para las opciones de líneas */
+.lines-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.line-option {
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
-.preview-split > div:hover {
-  transform: scale(1.05);
+.line-option.active .line-preview {
+  border-color: #8B4513;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
 }
 
-.preview-split > div:active {
-  transform: scale(0.98);
-}
-
-.predefined-colors {
-  margin-top: 2rem;
-  text-align: center;
-}
-
-.predefined-colors h4 {
-  margin-bottom: 1rem;
-  font-size: 1.5rem;
-}
-
-.color-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 1rem;
-  margin-top: 1rem;
-}
-
-.predefined-color {
+.line-preview {
+  width: 100%;
+  height: 150px;
+  border: 2px solid #eee;
+  border-radius: 8px;
   padding: 1rem;
-  border-radius: 8px;
-  cursor: pointer;
   transition: all 0.3s ease;
-  font-family: 'Caveat', cursive;
-  font-size: 1.2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 80px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  position: relative;
+  background: white;
 }
 
-.predefined-color:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+.line-preview.lined {
+  background-image: repeating-linear-gradient(transparent, transparent 31px, #ccc 32px);
 }
 
-.template-colors {
-  margin-top: 2rem;
-  text-align: center;
+.line-preview.dotted {
+  background-image: radial-gradient(circle, #ccc 1px, transparent 1px);
+  background-size: 20px 20px;
 }
 
-.template-colors h4 {
-  margin-bottom: 1rem;
-  font-size: 1.5rem;
+.line-preview.squared {
+  background-image: 
+    repeating-linear-gradient(transparent, transparent 31px, #ccc 32px),
+    repeating-linear-gradient(90deg, transparent, transparent 31px, #ccc 32px);
 }
 
-.colors-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 1rem;
-  margin-top: 1rem;
+.line-name {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.9);
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  color: #666;
 }
 
-.color-card {
-  padding: 1.5rem;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  font-family: 'Caveat', cursive;
-  font-size: 1.2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  text-align: center;
+/* Estilos para el contenido con diferentes líneas */
+.entry-content.lined {
+  background-image: repeating-linear-gradient(transparent, transparent 31px, #ccc 32px);
 }
 
-.color-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+.entry-content.dotted {
+  background-image: radial-gradient(circle, #ccc 1px, transparent 1px);
+  background-size: 20px 20px;
 }
 
-.color-name {
-  word-break: break-word;
-  line-height: 1.2;
-}
-
-.template-entries {
-  margin-top: 2rem;
-  text-align: center;
-}
-
-.template-entries h4 {
-  margin-bottom: 1rem;
-  font-size: 1.5rem;
-}
-
-.templates-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 1rem;
-  margin-top: 1rem;
-}
-
-.template-card {
-  padding: 1.5rem;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  font-family: 'Caveat', cursive;
-  font-size: 1.2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  text-align: center;
-}
-
-.template-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.template-name {
-  word-break: break-word;
-  line-height: 1.2;
+.entry-content.squared {
+  background-image: 
+    repeating-linear-gradient(transparent, transparent 31px, #ccc 32px),
+    repeating-linear-gradient(90deg, transparent, transparent 31px, #ccc 32px);
 }
 </style>
