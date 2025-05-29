@@ -63,7 +63,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import SeasonLoader from '@/views/components/SeasonLoader.vue';
 import FullCalendarWrapper from '@/components/Calendar/FullCalendarWrapper.vue';
@@ -130,6 +130,9 @@ const router = useRouter();
 const isLoading = ref(false);
 
 const currentActivity = ref(null);
+
+// Estado para controlar la inicialización completa
+const calendarFullyInitialized = ref(false);
 
 // Función para editar una actividad
 async function editActivity(activity) {

@@ -95,7 +95,8 @@ function animateSidenav(collapsed) {
 #sidenav-main {
   width: 250px;
   overflow: hidden;
-  transition: width 0.5s ease, overflow 0.5s ease;
+  transition: width 0.3s ease, margin 0.3s ease;
+  z-index: 1000;
 }
 
 #sidenav-main.collapsed {
@@ -103,11 +104,44 @@ function animateSidenav(collapsed) {
 }
 
 .navbar-brand-img {
-  transition: transform 0.5s ease;
+  transition: transform 0.3s ease;
   cursor: pointer;
+  max-width: 100%;
+  height: auto;
 }
 
 .collapsed-logo {
   transform: scale(0.8);
+}
+
+.sidenav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  transition: transform 0.3s ease;
+}
+
+.sidenav.collapsed + .main-content {
+  margin-left: 80px;
+}
+
+.main-content {
+  margin-left: 250px;
+  transition: margin-left 0.3s ease;
+}
+
+@media (max-width: 768px) {
+  #sidenav-main {
+    transform: translateX(-100%);
+  }
+  
+  #sidenav-main.show {
+    transform: translateX(0);
+  }
+  
+  .main-content {
+    margin-left: 0;
+  }
 }
 </style>

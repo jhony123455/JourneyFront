@@ -92,8 +92,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, defineEmits, defineProps } from "vue";
-import { Draggable } from "@fullcalendar/interaction";
+import { ref, onMounted, defineEmits, defineProps, nextTick } from "vue";
 
 const props = defineProps({
   availableActivities: {

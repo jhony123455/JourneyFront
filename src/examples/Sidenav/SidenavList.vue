@@ -304,9 +304,39 @@ async function handleLogout() {
 </script>
 
 <style scoped>
+#sidenav-collapse-main {
+  transition: all 0.3s ease-in-out;
+  width: 250px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  height: calc(100vh - 100px);
+}
+
+#sidenav-collapse-main.collapsed {
+  width: 80px;
+}
+
+#sidenav-collapse-main.collapsed .nav-item h6,
+#sidenav-collapse-main.collapsed .nav-item .nav-link-text {
+  opacity: 0;
+  visibility: hidden;
+}
+
+#sidenav-collapse-main.collapsed .material-icons-round {
+  margin: 0 auto;
+}
+
+#sidenav-collapse-main.collapsed .nav-item {
+  display: flex;
+  justify-content: center;
+  padding: 0.5rem 0;
+}
+
 .nav-item {
   transition: all 0.3s ease-in-out;
   border-radius: 12px;
+  margin: 0.25rem 0.5rem;
+  overflow: hidden;
 }
 
 .nav-item:hover {
@@ -315,20 +345,30 @@ async function handleLogout() {
   transform: translateY(-2px);
 }
 
-#sidenav-collapse-main {
-  transition: width 0.3s ease-in-out;
-  width: 250px;
-  overflow-x: hidden;
-}
-
-#sidenav-collapse-main.collapsed {
-  width: 80px;
-}
-
 .separator-mini {
   height: 1px;
   background-color: rgba(255, 255, 255, 0.1);
   width: 60%;
   margin: 10px auto;
+}
+
+.material-icons-round {
+  transition: margin 0.3s ease;
+  margin-right: 0.5rem;
+}
+
+.nav-link-text {
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.collapsed .nav-item h6 {
+  font-size: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.collapsed .nav-link {
+  padding: 0.5rem;
+  justify-content: center;
 }
 </style>

@@ -1,37 +1,5 @@
 <template>
   <div class="diary-view">
-    <!-- Menú principal -->
-    <div class="diary-menu" :class="{ 'menu-hidden': isCreatingEntry }">
-      <h2 class="diary-title">¿Qué quieres hacer hoy?</h2>
-      
-      <div class="menu-options">
-        <button class="menu-option" @click="startNewEntry">
-          <i class="material-icons-round">edit</i>
-          Nueva Entrada
-        </button>
-        
-        <button class="menu-option" @click="showEntries">
-          <i class="material-icons-round">book</i>
-          Ver Entradas
-        </button>
-      </div>
-    </div>
-
-    <!-- Componente de nueva entrada -->
-    <NewEntry 
-      v-if="isCreatingEntry" 
-      @close="isCreatingEntry = false"
-      @entry-saved="onEntrySaved"
-    />
-
-    <!-- Componente de ver entradas -->
-    <!-- 
-    <DiaryEntries 
-      v-if="showingEntries"
-      @close="showingEntries = false"
-    />
-    -->
-
     <div class="scene" ref="scene">
       <!-- Escritorio con elementos -->
       <div class="desk" ref="desk">
@@ -50,27 +18,38 @@
           
           <!-- Contenido del libro -->
           <div class="book-content" ref="bookContent">
-            <div class="pages-container">
-              <div class="page main-options" ref="mainOptionsPage">
-                <div class="page-content" ref="pageContent">
-                  <h2 class="page-title" ref="pageTitle">¿Qué quieres hacer hoy?</h2>
-                  <div class="options-container" ref="optionsContainer">
-                    <button class="diary-option" @click="handleNewEntry">
-                      <i class="material-icons-round">edit</i>
-                      Nueva Entrada
-                    </button>
-                    <button class="diary-option" @click="handleViewEntries">
-                      <i class="material-icons-round">book</i>
-                      Ver Entradas
-                    </button>
-                  </div>
-                </div>
+            <div class="page-content" ref="pageContent">
+              <h2 class="page-title" ref="pageTitle">¿Qué quieres hacer hoy?</h2>
+              <div class="options-container" ref="optionsContainer">
+                <button class="diary-option" @click="handleNewEntry">
+                  <i class="material-icons-round">edit</i>
+                  <span>Nueva Entrada</span>
+                </button>
+                <button class="diary-option" @click="handleViewEntries">
+                  <i class="material-icons-round">book</i>
+                  <span>Ver Entradas</span>
+                </button>
               </div>
             </div>
           </div>
         </div>
       </div>
     </div>
+
+    <Transition name="fade">
+      <NewEntry 
+        v-if="isCreatingEntry" 
+        @close="closeNewEntry"
+        @entry-saved="onEntrySaved"
+      />
+    </Transition>
+
+    <Transition name="fade">
+      <DiaryEntries 
+        v-if="showingEntries"
+        @close="closeEntries"
+      />
+    </Transition>
   </div>
 </template>
 
@@ -79,7 +58,7 @@ import { ref, onMounted, onUnmounted } from 'vue';
 import gsap from 'gsap';
 import { useRouter } from 'vue-router';
 import NewEntry from './components/NewEntry.vue';
-/* import DiaryEntries from './components/DiaryEntries.vue'; */
+import DiaryEntries from './components/DiaryEntries.vue';
 
 const router = useRouter();
 const scene = ref(null);
@@ -92,10 +71,11 @@ const pageContent = ref(null);
 const pageTitle = ref(null);
 const optionsContainer = ref(null);
 
-let mainTimeline;
-
 const isCreatingEntry = ref(false);
 const showingEntries = ref(false);
+const isAnimating = ref(false);
+
+let mainTimeline;
 
 onMounted(() => {
   initializeAnimation();
@@ -109,11 +89,6 @@ onUnmounted(() => {
 
 function initializeAnimation() {
   // Configuración inicial
-  gsap.set([pageTitle.value, '.diary-option'], {
-    opacity: 0,
-    y: 20
-  });
-
   gsap.set(scene.value, {
     perspective: 1000
   });
@@ -132,8 +107,9 @@ function initializeAnimation() {
     opacity: 0
   });
 
-  gsap.set(bookContent.value, {
-    opacity: 0
+  gsap.set([pageTitle.value, optionsContainer.value], {
+    opacity: 0,
+    y: 20
   });
 
   // Timeline principal
@@ -147,16 +123,18 @@ function initializeAnimation() {
     opacity: 1,
     rotationX: 15,
     y: 0,
-    duration: 1.5
+    duration: 1.5,
+    ease: 'elastic.out(1, 0.8)'
   });
 
-  // Entrada del libro
+  // Caída del libro
   mainTimeline.to(book.value, {
     scale: 1,
     rotationX: 0,
     y: 0,
     opacity: 1,
-    duration: 1
+    duration: 1,
+    ease: 'bounce.out'
   });
 
   // Abrir el libro
@@ -167,62 +145,104 @@ function initializeAnimation() {
     transformOrigin: 'left'
   });
 
-  // Mostrar contenido
-  mainTimeline.to(bookContent.value, {
+  // Mostrar título
+  mainTimeline.to(pageTitle.value, {
     opacity: 1,
+    y: 0,
     duration: 0.5
   });
 
-  // Mostrar título y opciones
-  mainTimeline.to([pageTitle.value, '.diary-option'], {
+  // Mostrar opciones
+  mainTimeline.to(optionsContainer.value, {
     opacity: 1,
     y: 0,
-    stagger: 0.2,
-    duration: 0.5
+    duration: 0.5,
+    ease: 'back.out(1.7)'
   });
 }
 
-// Manejadores de eventos
 function handleNewEntry() {
-  const tl = gsap.timeline();
-  
-  tl.to('.diary-option', {
-    opacity: 0,
-    y: 20,
-    duration: 0.3,
-    stagger: 0.1
-  }).to(pageTitle.value, {
+  if (isAnimating.value) return;
+  isAnimating.value = true;
+
+  const tl = gsap.timeline({
+    onComplete: () => {
+      isCreatingEntry.value = true;
+      isAnimating.value = false;
+    }
+  });
+
+  // Ocultamos los botones y el título
+  tl.to([optionsContainer.value, pageTitle.value], {
     opacity: 0,
     y: 20,
     duration: 0.3
-  }).to(bookContent.value, {
-    opacity: 0,
-    duration: 0.3,
-    onComplete: () => {
-      router.push('/diary/new');
-    }
   });
 }
 
 function handleViewEntries() {
-  const tl = gsap.timeline();
-  
-  tl.to('.diary-option', {
-    opacity: 0,
-    y: 20,
-    duration: 0.3,
-    stagger: 0.1
-  }).to(pageTitle.value, {
+  console.log('Click en Ver Entradas');
+  if (isAnimating.value) return;
+  isAnimating.value = true;
+
+  const tl = gsap.timeline({
+    onComplete: () => {
+      showingEntries.value = true;
+      isAnimating.value = false;
+    }
+  });
+
+  tl.to([optionsContainer.value, pageTitle.value], {
     opacity: 0,
     y: 20,
     duration: 0.3
-  }).to(bookContent.value, {
-    opacity: 0,
-    duration: 0.3,
-    onComplete: () => {
-      router.push('/diary/entries');
-    }
   });
+}
+
+function closeNewEntry() {
+  isCreatingEntry.value = false;
+  resetBookContent();
+}
+
+function closeEntries() {
+  showingEntries.value = false;
+  resetBookContent();
+}
+
+function resetBookContent() {
+  const tl = gsap.timeline();
+  
+  // Primero reseteamos la rotación del libro
+  tl.to(bookCover.value, {
+    rotationY: -180,
+    duration: 0.5,
+    ease: 'power2.inOut'
+  });
+
+  // Mostramos el contenido del libro
+  tl.set(bookContent.value, { 
+    opacity: 1,
+    display: 'flex'
+  });
+
+  // Mostramos el título y los botones con animación
+  tl.to(pageTitle.value, {
+    opacity: 1,
+    y: 0,
+    duration: 0.5
+  });
+
+  tl.to(optionsContainer.value, {
+    opacity: 1,
+    y: 0,
+    duration: 0.5,
+    ease: 'back.out(1.7)'
+  });
+}
+
+function onEntrySaved() {
+  closeNewEntry();
+  showingEntries.value = true;
 }
 
 function startNewEntry() {
@@ -233,11 +253,6 @@ function startNewEntry() {
 function showEntries() {
   showingEntries.value = true;
   isCreatingEntry.value = false;
-}
-
-function onEntrySaved() {
-  isCreatingEntry.value = false;
-  showingEntries.value = true; // Mostrar las entradas después de guardar una nueva
 }
 </script>
 
@@ -289,6 +304,7 @@ function onEntrySaved() {
       transparent 20px
     );
   border-radius: 10px;
+  pointer-events: none;
 }
 
 .book {
@@ -298,7 +314,6 @@ function onEntrySaved() {
   height: 90%;
   margin: 0 auto;
   transform-style: preserve-3d;
-  transform: translateZ(50px);
 }
 
 .book-cover {
@@ -313,15 +328,17 @@ function onEntrySaved() {
   transform-style: preserve-3d;
   box-shadow: -10px 10px 20px rgba(0,0,0,0.3);
   transform-origin: left;
+  z-index: 1;
 }
 
 .book-title {
   color: #FFD700;
-  font-size: 3rem;
+  font-size: 3.5rem;
   font-family: 'Playfair Display', serif;
   text-align: center;
   padding: 20px;
   text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+  font-weight: bold;
 }
 
 .book-content {
@@ -331,50 +348,64 @@ function onEntrySaved() {
   background: #fff;
   border-radius: 15px;
   padding: 2rem;
-  transform-style: preserve-3d;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transform-style: flat;
+  pointer-events: auto;
+  z-index: 2;
 }
 
 .page-content {
+  width: 100%;
   height: 100%;
-  background: repeating-linear-gradient(
-    transparent 0px,
-    transparent 24px,
-    #eee 25px
-  );
-  padding: 2rem;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  position: relative;
+  z-index: 3;
 }
 
 .page-title {
   font-family: 'Playfair Display', serif;
-  font-size: 2rem;
+  font-size: 3rem;
   color: #2c3e50;
-  margin-bottom: 2rem;
+  margin-bottom: 4rem;
   text-align: center;
+  font-weight: bold;
 }
 
 .options-container {
+  width: 100%;
+  max-width: 500px;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  width: 100%;
-  max-width: 400px;
+  gap: 2rem;
+  position: relative;
+  z-index: 4;
 }
 
 .diary-option {
-  background: none;
-  border: 2px solid #8B4513;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  padding: 1.5rem;
+  background: #fff;
+  border: 3px solid #8B4513;
   border-radius: 10px;
-  padding: 1rem 2rem;
-  font-size: 1.2rem;
+  font-size: 1.4rem;
   color: #8B4513;
+  font-weight: bold;
+  cursor: pointer;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 1rem;
-  cursor: pointer;
   transition: all 0.3s ease;
+  position: relative;
+  z-index: 5;
 }
 
 .diary-option:hover {
@@ -384,8 +415,18 @@ function onEntrySaved() {
   box-shadow: 0 5px 15px rgba(139, 69, 19, 0.2);
 }
 
+.diary-option:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(139, 69, 19, 0.3);
+}
+
 .diary-option i {
-  font-size: 1.5rem;
+  font-size: 1.6rem;
+  pointer-events: none;
+}
+
+.diary-option span {
+  pointer-events: none;
 }
 
 /* Elementos decorativos del escritorio */
@@ -432,13 +473,13 @@ function onEntrySaved() {
 }
 
 /* Animaciones de transición para router-view */
-.page-enter-active,
-.page-leave-active {
+.fade-enter-active,
+.fade-leave-active {
   transition: opacity 0.3s ease;
 }
 
-.page-enter-from,
-.page-leave-to {
+.fade-enter-from,
+.fade-leave-to {
   opacity: 0;
 }
 

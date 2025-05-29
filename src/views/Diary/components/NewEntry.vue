@@ -10,14 +10,14 @@
             <div
               class="original-color"
               :style="{ backgroundColor: previewColor }"
-              @click="previewColor = previewColor"
+              @click="selectOriginalColor"
             >
               <span class="preview-label">Original</span>
             </div>
             <div
               class="pastel-color"
               :style="{ backgroundColor: pastelPreviewColor }"
-              @click="previewColor = pastelPreviewColor"
+              @click="selectPastelColor"
             >
               <span class="preview-label">Pastel</span>
             </div>
@@ -28,29 +28,8 @@
           <el-color-picker
             v-model="previewColor"
             show-alpha
-            :predefine="defaultColors"
             @change="updatePreviewColor"
           />
-          <div class="color-suggestions" v-if="defaultColors.length > 0">
-            <h4 class="handwritten">Sugerencias</h4>
-            <div class="preset-colors">
-              <div
-                v-for="color in defaultColors"
-                :key="color"
-                class="preset-color"
-                :style="{ backgroundColor: color }"
-                @click="previewColor = color"
-              ></div>
-            </div>
-          </div>
-
-          <el-button
-            type="primary"
-            @click="confirmColor"
-            :disabled="!previewColor"
-          >
-            Usar este color
-          </el-button>
         </div>
       </div>
     </div>
@@ -97,15 +76,22 @@
 </template>
 
 <script setup>
-import { ref, computed, defineEmits } from "vue";
+import { ref, computed, defineEmits, defineProps, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import gsap from "gsap";
 import axios from "axios";
 import Swal from "sweetalert2";
 import { ElColorPicker, ElButton } from "element-plus";
 
+const props = defineProps({
+  entryToEdit: {
+    type: Object,
+    default: null
+  }
+});
+
 const router = useRouter();
-const emit = defineEmits(['close', 'entry-saved']);
+const emit = defineEmits(["close", "entry-saved"]);
 
 const overlay = ref(null);
 const colorSelector = ref(null);
@@ -120,9 +106,20 @@ const previewColor = ref("#FFFFFF");
 const entryTitle = ref("");
 const entryContent = ref("");
 const titleError = ref(false);
+const colorType = ref(null); // 'original' o 'pastel'
 
 // Eliminamos los colores predefinidos ya que vienen del backend
 const defaultColors = [];
+
+// Si estamos en modo edición, inicializamos con los valores existentes
+onMounted(() => {
+  if (props.entryToEdit) {
+    entryTitle.value = props.entryToEdit.title;
+    entryContent.value = props.entryToEdit.content;
+    selectedColor.value = props.entryToEdit.color || "#FFFFFF";
+    previewColor.value = props.entryToEdit.color || "#FFFFFF";
+  }
+});
 
 // Convertir color a versión pastel
 function convertToPastel(hexColor) {
@@ -173,28 +170,40 @@ const selectedTextColor = computed(() => {
 });
 
 function getContrastColor(bgColor) {
-  if (!bgColor) return "#000000";
+  if (!bgColor || bgColor === "transparent") return "#000000";
 
-  // Convertir el color hex a RGB
+  // Si el color es en formato rgba
+  if (bgColor.startsWith("rgba")) {
+    const rgba = bgColor.match(/[\d.]+/g);
+    if (rgba && rgba.length >= 3) {
+      const [r, g, b] = rgba.map(Number);
+      const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+      return luminance > 0.7 ? "#2c3e50" : "#000000";
+    }
+    return "#000000";
+  }
+
+  // Para colores hex
   const hex = bgColor.replace("#", "");
   const r = parseInt(hex.substring(0, 2), 16);
   const g = parseInt(hex.substring(2, 4), 16);
   const b = parseInt(hex.substring(4, 6), 16);
 
-  // Calcular la luminosidad
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-
-  // Retornar negro o gris oscuro para colores claros
   return luminance > 0.7 ? "#2c3e50" : "#000000";
 }
 
 function updatePreviewColor(color) {
-  previewColor.value = color;
+  previewColor.value = color || "#FFFFFF";
 }
 
-function confirmColor() {
-  if (!previewColor.value) return;
-  selectedColor.value = pastelPreviewColor.value;
+function selectOriginalColor() {
+  selectedColor.value = previewColor.value || "#FFFFFF";
+  animateToEditor();
+}
+
+function selectPastelColor() {
+  selectedColor.value = pastelPreviewColor.value || "#FFFFFF";
   animateToEditor();
 }
 
@@ -204,7 +213,8 @@ function animateToEditor() {
     scale: 0.9,
     duration: 0.3,
     onComplete: () => {
-      gsap.fromTo(entryEditor.value,
+      gsap.fromTo(
+        entryEditor.value,
         {
           opacity: 0,
           scale: 0.9,
@@ -212,10 +222,10 @@ function animateToEditor() {
         {
           opacity: 1,
           scale: 1,
-          duration: 0.3
+          duration: 0.3,
         }
       );
-    }
+    },
   });
 }
 
@@ -226,8 +236,8 @@ function cancelEntry() {
     onComplete: () => {
       isVisible.value = false;
       selectedColor.value = null;
-      emit('close');
-    }
+      emit("close");
+    },
   });
 }
 
@@ -237,33 +247,47 @@ async function saveEntry() {
     Swal.fire({
       icon: "error",
       title: "Error",
-      text: "El título es obligatorio"
+      text: "El título es obligatorio",
     });
     return;
   }
 
   try {
-    const response = await axios.post("/diary-entries", {
+    // Asegurarnos de que siempre tengamos un color válido
+    const finalColor = selectedColor.value || "#FFFFFF";
+    
+    const payload = {
       title: entryTitle.value.trim(),
-      content: entryContent.value,
-      color: selectedColor.value,
-      text_color: selectedTextColor.value
-    });
+      content: entryContent.value.trim(),
+      color: finalColor,
+      text_color: getContrastColor(finalColor),
+      entry_date: props.entryToEdit?.entry_date || new Date().toISOString().split('T')[0]
+    };
+
+    console.log('Guardando entrada:', payload);
+
+    let response;
+    if (props.entryToEdit) {
+      response = await axios.put(`/diary-entries/${props.entryToEdit.id}`, payload);
+    } else {
+      response = await axios.post("/diary-entries", payload);
+    }
 
     await Swal.fire({
       icon: "success",
       title: "¡Guardado!",
-      text: "Tu entrada ha sido guardada exitosamente",
+      text: `Tu entrada ha sido ${props.entryToEdit ? 'actualizada' : 'guardada'} exitosamente`,
       showConfirmButton: false,
-      timer: 1500
+      timer: 1500,
     });
 
-    emit('entry-saved', response.data);
+    emit("entry-saved", response.data);
   } catch (error) {
+    console.error('Error saving entry:', error);
     Swal.fire({
       icon: "error",
       title: "Error",
-      text: "No se pudo guardar la entrada. Por favor, intenta de nuevo."
+      text: "No se pudo guardar la entrada. Por favor, intenta de nuevo.",
     });
   }
 }

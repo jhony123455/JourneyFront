@@ -127,35 +127,35 @@ const convertToPastelColor = (color) => {
 };
 
 const mixCellColors = (dateStr, color) => {
-  const cell = document.querySelector(`[data-date='${dateStr}']`);
-  if (!cell) return;
+  nextTick(() => {
+    const cell = document.querySelector(`[data-date='${dateStr}']`);
+    if (!cell) return;
 
-  const pastelColor = convertToPastelColor(color);
+    const pastelColor = convertToPastelColor(color);
 
-  let colors = cellColorsMap.get(dateStr) || [];
+    let colors = cellColorsMap.get(dateStr) || [];
 
-  if (!colors.includes(pastelColor)) {
-    colors.push(pastelColor);
-    cellColorsMap.set(dateStr, [...new Set(colors)]); // Prevenir duplicados
-  }
-  const existingOverlays = cell.querySelectorAll(".color-overlay");
-  existingOverlays.forEach((overlay) => overlay.remove());
+    if (!colors.includes(pastelColor)) {
+      colors.push(pastelColor);
+      cellColorsMap.set(dateStr, [...new Set(colors)]); // Prevenir duplicados
+    }
+    
+    // Limitar las animaciones para mejorar el rendimiento
+    const existingOverlays = cell.querySelectorAll(".color-overlay");
+    existingOverlays.forEach((overlay) => overlay.remove());
 
-  if (colors.length === 1) {
-    gsap.fromTo(
-      cell,
-      { backgroundColor: "transparent" },
-      {
-        backgroundColor: colors[0],
-        duration: 0.5,
-        ease: "power2.out",
-      }
-    );
-  } else {
-    gsap.to(cell, { backgroundColor: "transparent", duration: 0.3 });
-    const segmentationType = getSegmentationType(colors.length);
-    applySegmentation(cell, colors, segmentationType);
-  }
+    if (colors.length === 1) {
+      // Simplificar: usar estilo directo en lugar de animación para un solo color
+      cell.style.backgroundColor = colors[0];
+    } else {
+      cell.style.backgroundColor = 'transparent';
+      // Usar requestAnimationFrame para operaciones de animación
+      requestAnimationFrame(() => {
+        const segmentationType = getSegmentationType(colors.length);
+        applySegmentation(cell, colors, segmentationType);
+      });
+    }
+  });
 };
 const getSegmentationType = (colorCount) => {
   const types = ["diagonal", "horizontal", "vertical", "checkered", "radial"];
@@ -632,8 +632,11 @@ const seasonAnimations = {
 };
 
 // Función para aplicar animaciones según la estación
+// Agregar un control para habilitar/deshabilitar animaciones
+const enableAnimations = ref(true); // Puedes hacer esto configurable
+
 const applySeasonalAnimation = (season = null) => {
-  if (!calendarCard.value) return;
+  if (!calendarCard.value || !enableAnimations.value) return;
 
   const container = calendarCard.value.$el;
   if (!container) {
@@ -645,7 +648,26 @@ const applySeasonalAnimation = (season = null) => {
   }
   const seasonToApply = season || getCurrentSeason();
   if (seasonAnimations[seasonToApply]) {
-    seasonAnimations[seasonToApply](container);
+    // Limitar la cantidad de elementos animados
+    const MAX_ELEMENTS = 10; // Reducir este número para mejorar rendimiento
+    
+    // Modificar las funciones de animación para usar MAX_ELEMENTS
+    const originalAnimation = seasonAnimations[seasonToApply];
+    const limitedAnimation = (cont) => {
+      clearSeasonalElements(cont);
+      originalAnimation(cont);
+      
+      // Limitar el número de elementos animados
+      const elements = cont.querySelectorAll('.seasonal-element:not(.color-overlay)');
+      if (elements.length > MAX_ELEMENTS) {
+        for (let i = MAX_ELEMENTS; i < elements.length; i++) {
+          elements[i].remove();
+        }
+      }
+    };
+    
+    limitedAnimation(container);
+    
     const seasonBackgrounds = {
       primavera: "linear-gradient(to bottom, #c1dfc4, #deecdd)",
       verano: "linear-gradient(to bottom, #fddb92, #d1fdff)",
@@ -744,63 +766,70 @@ const mergedCalendarOptions = computed(() => ({
     }
   },
     eventReceive(info) {
+      // Prevenir cualquier otro manejador de eventos
+      info.jsEvent?.preventDefault();
+      info.jsEvent?.stopPropagation();
+
       const dateStr = info.event.startStr;
       const extendedProps = info.event.extendedProps || {};
-    const activity = extendedProps.activity || {};
+      const activity = extendedProps.activity || {};
 
-    // Obtener el ID de la actividad
-    const activityId = extendedProps.activityId || activity.id;
+      // Obtener el ID de la actividad
+      const activityId = extendedProps.activityId || activity.id;
 
       if (!activityId) {
-      info.revert();
-        return;
+        info.revert();
+        return false;
       }
 
-    // Buscar la actividad en las disponibles
-    const foundActivity = props.availableActivities.find(act => act.id === activityId);
+      // Buscar la actividad en las disponibles
+      const foundActivity = props.availableActivities.find(act => act.id === activityId);
 
-    if (!foundActivity) {
-      info.revert();
-      return;
-    }
+      if (!foundActivity) {
+        info.revert();
+        return false;
+      }
 
-    // Convertir el color a pastel
-    const pastelColor = convertToPastelColor(foundActivity.color);
+      // Convertir el color a pastel
+      const pastelColor = convertToPastelColor(foundActivity.color);
 
-    // Convertir la fecha a formato local sin Z al final
-    const localStartDate = dayjs(dateStr).format('YYYY-MM-DD HH:mm:ss');
-    const localEndDate = info.event.endStr ? 
-      dayjs(info.event.endStr).format('YYYY-MM-DD HH:mm:ss') : null;
+      // Convertir la fecha a formato local sin Z al final
+      const localStartDate = dayjs(dateStr).format('YYYY-MM-DD HH:mm:ss');
+      const localEndDate = info.event.endStr ? 
+        dayjs(info.event.endStr).format('YYYY-MM-DD HH:mm:ss') : null;
 
       const eventData = {
-      title: foundActivity.title,
-      start_date: localStartDate,
-      end_date: localEndDate,
-      color: pastelColor,
+        title: foundActivity.title,
+        start_date: localStartDate,
+        end_date: localEndDate,
+        color: pastelColor,
         activity_id: activityId,
-      tags: foundActivity.tags || [],
-      all_day: true,
-      description: foundActivity.description || ''
-    };
+        tags: foundActivity.tags || [],
+        all_day: true,
+        description: foundActivity.description || ''
+      };
 
-    // Actualizar el evento visual inmediatamente
-    info.event.setProp('title', foundActivity.title);
-    info.event.setProp('backgroundColor', pastelColor);
-    info.event.setProp('borderColor', pastelColor);
+      // Actualizar el evento visual inmediatamente
+      info.event.setProp('title', foundActivity.title);
+      info.event.setProp('backgroundColor', pastelColor);
+      info.event.setProp('borderColor', pastelColor);
 
-    // Guardar el evento en la base de datos
-    createCalendarEvent(eventData)
-      .then(response => {
-        info.event.setProp('id', response.id.toString());
-        
-        // Actualizar el color de la celda
-        mixCellColors(dateStr, pastelColor);
-        lastEventDateMap.set(dateStr, pastelColor);
-      })
-      .catch(() => {
-        info.revert(); // Revertir el evento si hay error
-      });
-  },
+      // Guardar el evento en la base de datos
+      createCalendarEvent(eventData)
+        .then(response => {
+          // Actualizar el ID del evento con el retornado por el servidor
+          info.event.setProp('id', response.id.toString());
+          
+          // Actualizar el color de la celda
+          mixCellColors(dateStr, pastelColor);
+          lastEventDateMap.set(response.id.toString(), dateStr);
+        })
+        .catch(() => {
+          info.revert(); // Revertir el evento si hay error
+        });
+
+      return false; // Evitar que el evento se propague
+    },
     eventDrop(info) {
       eventDropHandler(info);
       const updatedEventData = {

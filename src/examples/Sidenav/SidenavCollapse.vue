@@ -10,11 +10,11 @@
     :aria-expanded="isExpanded"
     :aria-controls="collapseRef"
     @click="toggleExpand"
-    @mouseenter="showTooltip = true"
-    @mouseleave="showTooltip = false"
+    @mouseenter="handleMouseEnter"
+    @mouseleave="handleMouseLeave"
   >
     <div 
-      class="icon-wrapper d-flex align-items-center justify-content-center" 
+      class="icon-wrapper"
       :class="[
         isRTL ? 'ms-2' : 'me-2',
         isSidenavCollapsed ? 'mx-auto icon-enlarged' : ''
@@ -31,9 +31,14 @@
       {{ navText }}
     </span>
     
-    <span v-if="isSidenavCollapsed && showTooltip" class="sidenav-tooltip">
+    <div 
+      v-if="isSidenavCollapsed && showTooltip" 
+      class="sidenav-tooltip"
+      :class="{ show: showTooltip }"
+      :style="{ top: tooltipTop + 'px' }"
+    >
       {{ navText }}
-    </span>
+    </div>
   </router-link>
 
   <div v-show="isExpanded && !isSidenavCollapsed" class="collapse" ref="submenuRef">
@@ -68,6 +73,7 @@ const store = useStore()
 const isExpanded = ref(false)
 const submenuRef = ref(null)
 const showTooltip = ref(false)
+const tooltipTop = ref(0)
 
 const toggleExpand = () => {
   if (!isSidenavCollapsed.value) {
@@ -107,12 +113,26 @@ watch(isExpanded, async (expanded) => {
     })
   }
 })
+
+function handleMouseEnter(event) {
+  if (isSidenavCollapsed.value) {
+    tooltipTop.value = event.target.getBoundingClientRect().top
+    showTooltip.value = true
+  }
+}
+
+function handleMouseLeave() {
+  showTooltip.value = false
+}
 </script>
 
 <style scoped>
 .icon-wrapper {
   min-width: 2rem;
   transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .icon-enlarged {
@@ -122,28 +142,45 @@ watch(isExpanded, async (expanded) => {
 .nav-link {
   transition: all 0.3s ease;
   position: relative;
+  white-space: nowrap;
+  padding: 0.75rem 1rem;
 }
 
 .nav-link-text {
   transition: opacity 0.3s ease;
   white-space: nowrap;
+  opacity: 1;
 }
 
 .sidenav-tooltip {
-  position: absolute;
-  left: 100%;
-  top: 50%;
-  transform: translateY(-50%);
+  position: fixed;
+  left: 85px;
   background-color: rgba(0, 0, 0, 0.8);
   color: white;
   padding: 5px 10px;
   border-radius: 4px;
   font-size: 12px;
-  opacity: 1;
-  visibility: visible;
+  opacity: 0;
+  visibility: hidden;
   pointer-events: none;
   white-space: nowrap;
   z-index: 1000;
-  margin-left: 8px;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.sidenav-tooltip.show {
+  opacity: 1;
+  visibility: visible;
+}
+
+.collapse {
+  transition: height 0.3s ease-in-out;
+  overflow: hidden;
+}
+
+.nav-link.active {
+  background-color: var(--bs-primary);
+  color: white;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 </style>

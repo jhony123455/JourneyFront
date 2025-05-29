@@ -77,6 +77,8 @@ export default function useCalendar() {
   const lastEventDateMap = new Map();
   const cellColorsMap = new Map();
 
+  let draggableInstance = null;
+
   // Computed
   const formattedActivities = computed(() => {
     console.log('Formateando actividades. scheduledActivities:', scheduledActivities.value);
@@ -163,6 +165,12 @@ export default function useCalendar() {
     initializationStatus.state = 'idle';
     initializationStatus.promise = null;
     calendarReady.value = false;
+    
+    // Destruir la instancia de Draggable al desmontar
+    if (draggableInstance) {
+      draggableInstance.destroy();
+      draggableInstance = null;
+    }
   });
 
   function openTagManager() {
@@ -339,46 +347,8 @@ export default function useCalendar() {
   }
 
   function handleDrop(info) {
-    const droppedActivityData = JSON.parse(
-      info.draggedEl.getAttribute("data-event")
-    );
-    const activityObj = droppedActivityData.extendedProps.activity;
-
-    // Ajustar la fecha de inicio a la zona horaria de Colombia
-    const colombiaDate = dayjs(info.date)
-      .tz("America/Bogota")
-      .format("YYYY-MM-DD");
-    const now = new Date();
-    const minutes = now.getMinutes();
-    const roundedMinutes = minutes < 30 ? "00" : "30";
-    const hours = now.getHours().toString().padStart(2, "0");
-
-    const activityStart = `${colombiaDate}T${hours}:${roundedMinutes}:00`;
-    const startDate = new Date(activityStart);
-    const endDate = new Date(startDate);
-    endDate.setMinutes(startDate.getMinutes() + 60);
-
-    const activityToAdd = {
-      id: `activity-${Date.now()}`,
-      title: activityObj.title,
-      start: activityStart,
-      end: endDate.toISOString(),
-      backgroundColor: activityObj.color || "#5e72e4",
-      textColor: "#ffffff",
-      extendedProps: {
-        tags: activityObj.tags || [],
-        activityId: activityObj.id,
-      },
-    };
-
-    scheduledActivities.value.push(activityToAdd);
-    showNotification(
-      `${activityObj.title} añadido al ${formatDate(colombiaDate)}`
-    );
-
-    nextTick(() => {
-      refreshCalendar();
-    });
+    // Desactivar el manejo del evento aquí ya que se maneja en FullCalendarWrapper
+    return false;
   }
 
   function handleActivityDrop(info) {
@@ -614,10 +584,16 @@ export default function useCalendar() {
   }
 
   function initDraggableActivities() {
+    // Si ya existe una instancia, destruirla primero
+    if (draggableInstance) {
+      draggableInstance.destroy();
+      draggableInstance = null;
+    }
+
     nextTick(() => {
       const containerEl = document.querySelector(".activities-container");
       if (containerEl) {
-        new Draggable(containerEl, {
+        draggableInstance = new Draggable(containerEl, {
           itemSelector: ".draggable-activity",
           eventData: function (eventEl) {
             const data = eventEl.getAttribute("data-event");
@@ -888,20 +864,17 @@ export default function useCalendar() {
     // Iniciar carga de datos
     initialize().then(() => {
       loadCalendarEvents(); // Cargar los eventos del calendario después de la inicialización
+      
+      // Inicializar elementos arrastrables inmediatamente después de cargar eventos
+      nextTick(() => {
+        initDraggableActivities();
+        refreshCalendar();
+        animateCalendarLoad(".calendar-fade-enter-active");
+      });
     }).catch(error => {
       console.error('Error en la inicialización del calendario:', error);
     });
-
-    setTimeout(() => {
-      nextTick(() => {
-        if (initializationStatus.state === 'completed') {
-          refreshCalendar();
-          animateCalendarLoad(".calendar-fade-enter-active");
-          initDraggableActivities();
-        }
-      });
-    }, 1000);
-
+  
     document.addEventListener("click", handleDocumentClick);
   });
 
